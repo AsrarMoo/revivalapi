@@ -1,0 +1,2 @@
+[build]
+runtime = "php@8.1"
