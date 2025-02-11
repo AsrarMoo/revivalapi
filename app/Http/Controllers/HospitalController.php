@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Hospital;
@@ -22,44 +23,38 @@ class HospitalController extends Controller
             'hospital_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-        // سجل البيانات المدخلة لمراقبة المشاكل
         Log::debug('Received request data:', $request->all());
 
         // حفظ الصورة إذا وُجدت
-        $imagePath = null;
+        $imageName = null;
         if ($request->hasFile('hospital_image')) {
-            $imagePath = $request->file('hospital_image')->store('hospitals', 'public'); // حفظ الصورة في storage/app/public/hospitals
-            $imageName = basename($imagePath); // استخراج اسم الصورة فقط
+            $imagePath = $request->file('hospital_image')->store('hospitals', 'public');
+            $imageName = basename($imagePath);
             Log::debug('Image stored at:', [$imagePath]);
-        } else {
-            Log::debug('No image uploaded');
-            $imageName = null;
         }
 
         try {
-            // إنشاء المستخدم المرتبط
             $user = User::create([
                 'name' => $request->hospital_name,
                 'password' => Hash::make($request->password),
                 'user_type' => 'Hospital',
                 'is_active' => true,
             ]);
-            Log::debug('User created:', $user->toArray());
 
-            // إنشاء المستشفى وربطه بالمستخدم
+            Log::debug('User created:', ['user' => $user->toArray()]);
+
             $hospital = Hospital::create([
                 'hospital_name' => $request->hospital_name,
                 'hospital_email' => $request->hospital_email,
                 'hospital_address' => $request->hospital_address,
                 'hospital_phone' => $request->hospital_phone,
-                'hospital_image' => $imageName, // تخزين فقط اسم الصورة
+                'hospital_image' => $imageName,
                 'user_id' => $user->user_id,
             ]);
-            Log::debug('Hospital created:', $hospital->toArray());
 
-            // إرجاع البيانات بدون كلمة المرور
-            $userWithoutPassword = $user->makeHidden(['password']);
-            return response()->json(['hospital' => $hospital, 'user' => $userWithoutPassword], 201);
+            Log::debug('Hospital created:', ['hospital' => $hospital->toArray()]);
+
+            return response()->json(['hospital' => $hospital, 'user' => $user->makeHidden(['password'])], 201);
         } catch (\Exception $e) {
             Log::error('Error occurred during hospital creation: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to create hospital', 'error' => $e->getMessage()], 500);
@@ -70,10 +65,10 @@ class HospitalController extends Controller
     public function update(Request $request, $hospital_id)
     {
         $hospital = Hospital::findOrFail($hospital_id);
-    
+
         $request->validate([
             'hospital_name' => 'sometimes|string|max:255',
-            'hospital_email' => 'sometimes|email|unique:hospitals,hospital_email,' . $hospital->hospital_id, 
+            'hospital_email' => 'sometimes|email|unique:hospitals,hospital_email,' . $hospital->hospital_id,
             'hospital_address' => 'sometimes|string|max:255',
             'hospital_phone' => 'sometimes|string|max:15',
             'hospital_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -82,26 +77,17 @@ class HospitalController extends Controller
         // تحديث الصورة إذا تم رفع صورة جديدة
         if ($request->hasFile('hospital_image')) {
             // حذف الصورة القديمة إن وجدت
-            if ($hospital->hospital_image) {
+            if ($hospital->hospital_image && Storage::disk('public')->exists('hospitals/' . $hospital->hospital_image)) {
                 Storage::disk('public')->delete('hospitals/' . $hospital->hospital_image);
             }
 
             // رفع الصورة الجديدة
             $imagePath = $request->file('hospital_image')->store('hospitals', 'public');
-            $imageName = basename($imagePath);
-        } else {
-            $imageName = $hospital->hospital_image;
+            $hospital->hospital_image = basename($imagePath);
         }
-    
-        // تحديث بيانات المستشفى
-        $hospital->update([
-            'hospital_name' => $request->hospital_name ?? $hospital->hospital_name,
-            'hospital_email' => $request->hospital_email ?? $hospital->hospital_email,
-            'hospital_address' => $request->hospital_address ?? $hospital->hospital_address,
-            'hospital_phone' => $request->hospital_phone ?? $hospital->hospital_phone,
-            'hospital_image' => $imageName,
-        ]);
-    
+
+        $hospital->update($request->only(['hospital_name', 'hospital_email', 'hospital_address', 'hospital_phone', 'hospital_image']));
+
         return response()->json(['hospital' => $hospital], 200);
     }
 
@@ -109,42 +95,54 @@ class HospitalController extends Controller
     public function show($hospital_id)
     {
         $hospital = Hospital::with('user')->findOrFail($hospital_id);
+        
+        if ($hospital->hospital_image) {
+            $hospital->hospital_image = url('storage/hospitals/' . $hospital->hospital_image);
+        }
+    
         return response()->json(['hospital' => $hospital], 200);
     }
-
-    // استرجاع جميع المستشفيات
+    
     public function index()
     {
         $hospitals = Hospital::all();
+    
+        foreach ($hospitals as $hospital) {
+            if ($hospital->hospital_image) {
+                $hospital->hospital_image = url('storage/hospitals/' . $hospital->hospital_image);
+            }
+        }
+    
         return response()->json(['hospitals' => $hospitals], 200);
     }
-
-    // حذف المستشفى والمستخدم المرتبط
+    
+    
+    // حذف المستشفى والمستخدم المرتبط به
     public function destroy($hospital_id)
     {
         try {
             $hospital = Hospital::findOrFail($hospital_id);
-            
-            // حذف الصورة المرتبطة إذا كانت موجودة
-            if ($hospital->hospital_image) {
-                Storage::disk('public')->delete('hospitals/' . $hospital->hospital_image);
-            }
+            $user = User::find($hospital->user_id);
 
-            // حذف المستخدم المرتبط
-            $user = User::where('user_id', $hospital->user_id)->first();
-            if ($user) {
-                $user->delete();
+            // حذف الصورة إذا كانت موجودة
+            if ($hospital->hospital_image && Storage::disk('public')->exists('hospitals/' . $hospital->hospital_image)) {
+                Storage::disk('public')->delete('hospitals/' . $hospital->hospital_image);
             }
 
             // حذف المستشفى
             $hospital->delete();
-    
-            return response()->json(['message' => 'تم حذف المستشفى بنجاح'], 200);
+            Log::debug('Hospital deleted:', ['hospital_id' => $hospital_id]);
+
+            // حذف المستخدم المرتبط إذا وُجد
+            if ($user) {
+                $user->delete();
+                Log::debug('User deleted:', ['user_id' => $hospital->user_id]);
+            }
+
+            return response()->json(['message' => 'Hospital and associated user deleted successfully'], 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'حدث خطأ أثناء حذف المستشفى',
-                'error' => $e->getMessage()
-            ], 500);
+            Log::error('Error occurred during hospital deletion: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to delete hospital', 'error' => $e->getMessage()], 500);
         }
     }
 }
