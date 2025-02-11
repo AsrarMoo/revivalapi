@@ -18,50 +18,58 @@ use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\HospitalController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 
-
-Route::get('/patients', [PatientController::class, 'index']); // استعراض جميع المرضى
-Route::get('/patients/{id}', [PatientController::class, 'show']); // استعراض مريض محدد
-Route::post('/patients', [PatientController::class, 'store']); // إضافة مريض جديد
-Route::put('/patients/{id}', [PatientController::class, 'update']); // تعديل مريض
-Route::delete('/patients/{id}', [PatientController::class, 'destroy']); // حذف مريض
-
-Route::get('/doctors', [DoctorController::class, 'index']); // استعراض جميع الأطباء
-Route::get('/doctors/{id}', [DoctorController::class, 'show']); // استعراض طبيب محدد
-Route::post('/doctors', [DoctorController::class, 'store']); // إضافة طبيب جديد
-Route::put('/doctors/{id}', [DoctorController::class, 'update']); // تعديل طبيب
-Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']); // حذف طبيب
-
-Route::get('/hospitals', [HospitalController::class, 'index']);
-
-// استعراض مستشفى محدد
-Route::get('/hospitals/{hospital_id}', [HospitalController::class, 'show']);
-
-// إضافة مستشفى جديد
-Route::post('/hospitals', [HospitalController::class, 'store']);
-
-// تعديل مستشفى
-Route::put('/hospitals/{hospital_id}', [HospitalController::class, 'update']);
-
-// حذف مستشفى
-Route::delete('/hospitals/{hospital_id}', [HospitalController::class, 'destroy']);
-
-
-Route::get('/admins', [AdminController::class, 'index']); // استعراض جميع المدراء
-Route::get('/admins/{id}', [AdminController::class, 'show']); // استعراض مدير محدد
-Route::post('/admins', [AdminController::class, 'store']); // إضافة مدير جديد
-Route::put('/admins/{id}', [AdminController::class, 'update']); // تعديل مدير
-Route::delete('/admins/{id}', [AdminController::class, 'destroy']); // حذف مدير
-
-
-
-
-
-
-
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
+// **المصادقة (Authentication)**
 Route::post('/login', [AuthController::class, 'login']);
-
-
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+Route::post('/refresh', [AuthController::class, 'refresh']);
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('jwt.auth');
+// **مسارات المستخدمين (Users)**
+Route::prefix('users')->group(function () {
+    Route::get('/', [UserController::class, 'index']);       // جميع المستخدمين
+    Route::get('/{id}', [UserController::class, 'show']);    // مستخدم معين
+    Route::post('/', [UserController::class, 'store']);      // إضافة مستخدم
+    Route::put('/{id}', [UserController::class, 'update']);  // تعديل بيانات المستخدم
+    Route::delete('/{id}', [UserController::class, 'destroy']); // حذف مستخدم
+});
+// **مسارات المرضى (Patients)**
+Route::prefix('patients')->group(function () {
+    Route::get('/', [PatientController::class, 'index']);
+    Route::get('/{id}', [PatientController::class, 'show']);
+    Route::post('/', [PatientController::class, 'store']);
+    Route::put('/{id}', [PatientController::class, 'update']);
+    Route::delete('/{id}', [PatientController::class, 'destroy']);
+});
+// **مسارات الأطباء (Doctors)**
+Route::prefix('doctors')->group(function () {
+    Route::get('/', [DoctorController::class, 'index']);
+    Route::get('/{id}', [DoctorController::class, 'show']);
+    Route::post('/', [DoctorController::class, 'store']);
+    Route::put('/{id}', [DoctorController::class, 'update']);
+    Route::delete('/{id}', [DoctorController::class, 'destroy']);
+});
+// **مسارات المستشفيات (Hospitals)**
+Route::prefix('hospitals')->group(function () {
+    Route::get('/', [HospitalController::class, 'index']);
+    Route::get('/{id}', [HospitalController::class, 'show']);
+    Route::post('/', [HospitalController::class, 'store']);
+    Route::put('/{id}', [HospitalController::class, 'update']);
+    Route::delete('/hospitals/{id}', [HospitalController::class, 'destroy']);
+});
+// **مسارات المسؤولين (Admins)**
+Route::prefix('admins')->group(function () {
+    Route::get('/', [AdminController::class, 'index']);
+    Route::get('/{id}', [AdminController::class, 'show']);
+    Route::post('/', [AdminController::class, 'store']);
+    Route::put('/{id}', [AdminController::class, 'update']);
+    Route::delete('/{id}', [AdminController::class, 'destroy']);
+});
+// **استرجاع بيانات المستخدم المسجل حاليًا**
+Route::middleware('jwt.auth')->get('/user', function (Request $request) {
     return $request->user();
 });

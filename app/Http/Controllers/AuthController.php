@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
+use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use Tymon\JWTAuth\Exceptions\JWTException;
 
 class AuthController extends Controller
 {
@@ -35,30 +38,60 @@ class AuthController extends Controller
             return response()->json(['error' => 'Account is inactive'], 403);
         }
 
+        // إنشاء التوكن
+        $token = JWTAuth::fromUser($user);
+
         // التوجيه حسب نوع المستخدم
-        $redirectUrl = '';
-        switch ($user->user_type) {
-            case 'Admin':
-                $redirectUrl = '/admin/dashboard';
-                break;
-            case 'Doctor':
-                $redirectUrl = '/doctor/dashboard';
-                break;
-            case 'Hospital':
-                $redirectUrl = '/hospital/dashboard';
-                break;
-            case 'Patient':
-                $redirectUrl = '/patient/dashboard';
-                break;
-            default:
-                return response()->json(['error' => 'Invalid user type'], 400);
+        $redirectUrl = match ($user->user_type) {
+            'Admin' => '/admin',
+            'Doctor' => '/doctorhome',
+            'Hospital' => '/hospital/dashboard',
+            'Patient' => '/patient/dashboard',
+            default => null
+        };
+
+        if (!$redirectUrl) {
+            return response()->json(['error' => 'Invalid user type'], 400);
         }
 
         // إرجاع استجابة تسجيل الدخول
         return response()->json([
             'message' => 'Login successful',
             'redirect_url' => $redirectUrl,
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => auth()->factory()->getTTL() * 60, // مدة انتهاء التوكن بالدقائق
             'user' => $user,
         ], 200);
+    }
+
+    // دالة Refresh Token
+    public function refresh()
+    {
+        try {
+            $newToken = JWTAuth::parseToken()->refresh();
+            return response()->json([
+                'access_token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => auth()->factory()->getTTL() * 60
+            ]);
+        } catch (TokenExpiredException $e) {
+            return response()->json(['error' => 'Token has expired'], 401);
+        } catch (TokenInvalidException $e) {
+            return response()->json(['error' => 'Invalid token'], 401);
+        } catch (JWTException $e) {
+            return response()->json(['error' => 'Token not provided'], 400);
+        }
+    }
+
+    // دالة تسجيل الخروج
+    public function logout()
+    {
+        try {
+            JWTAuth::invalidate(JWTAuth::getToken());
+            return response()->json(['message' => 'Successfully logged out']);
+        } catch (JWTException $e) {
+            return response()->json(['error' => 'Failed to logout'], 500);
+        }
     }
 }

@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable
 {
@@ -51,4 +52,36 @@ class User extends Authenticatable
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * تشفير كلمة المرور تلقائيًا عند الحفظ أو التحديث.
+     */
+    public function setPasswordAttribute($value)
+    {
+        $this->attributes['password'] = Hash::make($value);
+    }
+
+    /**
+     * العلاقة بين المستخدم والطبيب (كل طبيب لديه حساب مستخدم).
+     */
+    public function doctor()
+    {
+        return $this->hasOne(Doctor::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * العلاقة بين المستخدم والمريض (كل مريض لديه حساب مستخدم).
+     */
+    public function patient()
+    {
+        return $this->hasOne(Patient::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * العلاقة بين المستخدم والمستشفى (كل مستشفى لديه حساب مستخدم).
+     */
+    public function hospital()
+    {
+        return $this->hasOne(Hospital::class, 'user_id', 'user_id');
+    }
 }
