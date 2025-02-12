@@ -110,6 +110,8 @@ class HospitalController extends Controller
         foreach ($hospitals as $hospital) {
             if ($hospital->hospital_image) {
                 $hospital->hospital_image = url('storage/hospitals/' . $hospital->hospital_image);
+                
+
             }
         }
     
