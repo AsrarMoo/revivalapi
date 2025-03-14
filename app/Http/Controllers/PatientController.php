@@ -43,6 +43,7 @@ class PatientController extends Controller
                 'email' => $validatedData['email'],
                 'password' => Hash::make($validatedData['password']),
                 'user_type' => 'patient',
+                
             ]);
 
             $patient = Patient::create(array_merge($validatedData, ['user_id' => $user->user_id]));

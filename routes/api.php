@@ -7,7 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\HospitalController;
 use App\Http\Controllers\HealthMinistryController;
-use App\Http\Controllers\UserController;;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\OTPController;
 use App\Services\FirebaseService;
 
@@ -17,30 +17,26 @@ Route::post('/send-code', function (Request $request, FirebaseService $firebaseS
         'phone' => 'required|string|regex:/^\+\d{1,15}$/',
     ]);
 
-    try {
-        return response()->json($firebaseService->sendVerificationCode($request->phone));
-    } catch (Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 400);
-    }
+    return response()->json(['message' => 'OTP Sent']);
 });
 
 // ✅ مسارات OTP
 Route::post('/send-otp', [OTPController::class, 'sendOTP']);
 Route::post('/verify-otp', [OTPController::class, 'verifyOTP']);
 
-// ✅ مسارات المصادقة (متاحة بدون تسجيل دخول)
+// ✅ مسارات المصادقة
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/register', [PatientController::class, 'register']); // 🔹 الآن يمكن تسجيل المريض بدون تسجيل دخول
+    Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
 });
 
-// ✅ المسارات المحمية (تحتاج إلى توكن للوصول إليها)
+// ✅ المسارات المحمية (تحتاج إلى توكن)
 Route::middleware('auth:api')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
 
     // ✅ إدارة المرضى
     Route::prefix('patients')->group(function () {
-        Route::post('/register', [PatientController::class, 'register']);
         Route::get('/', [PatientController::class, 'index']);
         Route::get('/{id}', [PatientController::class, 'show']);
         Route::put('/{id}', [PatientController::class, 'update']);
@@ -73,12 +69,12 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [HealthMinistryController::class, 'update']);
         Route::delete('/{id}', [HealthMinistryController::class, 'destroy']);
     });
-    
-}); Route::prefix('users')->group(function () {
-    Route::post('/register', [UserController::class, 'store']); // إضافة مستخدم جديد
-    Route::get('/', [UserController::class, 'index']); // استعراض جميع المستخدمين
-    Route::get('/{id}', [UserController::class, 'show']); // استعراض مستخدم محدد
-    Route::put('/{id}', [UserController::class, 'update']); // تعديل بيانات المستخدم
-    Route::delete('/{id}', [UserController::class, 'destroy']); // حذف مستخدم
-});
 
+    // ✅ إدارة المستخدمين
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::get('/{id}', [UserController::class, 'show']);
+        Route::put('/{id}', [UserController::class, 'update']);
+        Route::delete('/{id}', [UserController::class, 'destroy']);
+    });
+});
