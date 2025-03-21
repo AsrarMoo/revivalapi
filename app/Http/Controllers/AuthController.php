@@ -55,7 +55,7 @@ class AuthController extends Controller
     protected function getUserRedirect($userType)
     {
         $routes = [
-            'admin' => '/dashboard/admin',
+            'healthMinistry' => '/dashboard/healthMinistry',
             'doctor' => '/dashboard/doctor',
             'hospital' => '/dashboard/hospital',
             'patient' => '/dashboard/patient'
