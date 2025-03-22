@@ -18,6 +18,12 @@ return new class extends Migration {
             $table->string('hospital_phone', 15)->unique();
             $table->string('hospital_image')->nullable();
             $table->timestamps();
+            Schema::table('hospitals', function (Blueprint $table) {
+                $table->decimal('latitude', 10, 8)->nullable();
+                $table->decimal('longitude', 11, 8)->nullable();
+            });
+           
+                        
         });
     }
 

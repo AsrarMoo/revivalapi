@@ -12,7 +12,7 @@ class HealthMinistry extends Model
     protected $primaryKey = 'health_ministry_id'; // تحديد المفتاح الأساسي
 
     protected $fillable = [
-        'name',
+        'health_ministry_name',
         'phone',
         'user_id',
     ];

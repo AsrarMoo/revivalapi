@@ -17,7 +17,7 @@ class User extends Authenticatable implements JWTSubject
     protected $keyType = 'int';
 
     protected $fillable = [
-        'name',
+       // 'name',
         'email',
         'password',
         'user_type',
@@ -39,14 +39,17 @@ class User extends Authenticatable implements JWTSubject
     // ✅ العلاقة مع المرضى
     public function patient()
     {
-        return $this->hasOne(Patient::class, 'user_id', 'user_id');
+        return $this->belongsTo(Patient::class, 'patient_id', 'patient_id');
     }
+    
 
     // ✅ العلاقة مع الأطباء
     public function doctor()
     {
-        return $this->hasOne(Doctor::class, 'doctor_id', 'doctor_id');
+        return $this->belongsTo(Doctor::class, 'doctor_id', 'doctor_id');
     }
+    
+    
 
     // ✅ العلاقة مع المستشفيات
     public function hospital()
@@ -70,4 +73,5 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
 }

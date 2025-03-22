@@ -4,29 +4,21 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+return new class extends Migration {
+    public function up()
     {
         Schema::create('appointments', function (Blueprint $table) {
-            $table->increments('appointment_id');
-            $table->unsignedInteger('patient_id')->index('fk_appoiappointment_patient');
-            $table->unsignedInteger('hospital_id')->index('fk__appointment_hospital');
-            $table->unsignedInteger('doctor_id')->index('fk_appointment_doctor');
-            $table->unsignedInteger('schedule_id')->index('fk_appointment_schedule');
-            $table->enum('status', ['Pending', 'Confirmed', 'Cancelled'])->nullable()->default('Pending');
-            $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
+            $table->id('appointment_id');
+            $table->foreignId('patient_id')->constrained('patients')->onDelete('cascade');
+            $table->foreignId('hospital_id')->constrained('hospitals')->onDelete('cascade');
+            $table->foreignId('doctor_id')->constrained('doctors')->onDelete('cascade');
+            $table->foreignId('schedule_id')->constrained('schedules')->onDelete('cascade');
+            $table->enum('status', ['Pending', 'Confirmed', 'Cancelled', 'appointment','Completed','Rejected'])->default('Pending');
+            $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('appointments');
     }

@@ -17,8 +17,10 @@ return new class extends Migration
             $table->unsignedInteger('hospital_id')->index('fk_schedule_hospital');
             $table->dateTime('start_time');
             $table->dateTime('end_time');
-            $table->enum('status', ['available', 'booked', 'cancelled'])->nullable()->default('available');
-            $table->timestamp('created_at')->useCurrent();
+            $table->enum('status', ['available', 'booked','pending' ,'cancelled'])->nullable()->default('available');
+        $table->time('proposed_start_time')->nullable();
+        $table->time('proposed_end_time')->nullable();
+          $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
         });
     }

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->increments('user_id');
-            $table->string('name');
+            $table->string('name')->nullable()->change();
             $table->string('email')->unique();
             $table->string('password');
             $table->enum('user_type', ['patient', 'doctor', 'hospital', 'admin']);

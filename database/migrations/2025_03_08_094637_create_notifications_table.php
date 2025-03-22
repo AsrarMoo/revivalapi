@@ -13,12 +13,21 @@ return new class extends Migration
     {
         Schema::create('notifications', function (Blueprint $table) {
             $table->increments('notification_id');
-            $table->unsignedInteger('user_id')->index('fk_notification_user');
+
+            // 🔹 تحديد المستخدم المستلم للإشعار
+            $table->unsignedBigInteger('user_id')->nullable()->index('fk_notification_user');
+            $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
+
+            // 🔹 تحديد من أنشأ الإشعار
+            $table->unsignedBigInteger('created_by')->nullable()->index('fk_notification_creator');
+            $table->foreign('created_by')->references('user_id')->on('users')->onDelete('cascade');
+
             $table->string('title');
             $table->text('message');
-            $table->enum('type', ['booking', 'ambulance', 'general']);
-            $table->boolean('is_read')->nullable()->default(false);
+            $table->enum('type', ['booking', 'ambulance','Rejected', 'general']);
+            $table->boolean('is_read')->default(false);
             $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate(); // 🔹 تحديث تلقائي عند التعديل
         });
     }
 

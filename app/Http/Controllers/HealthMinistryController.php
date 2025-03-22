@@ -6,6 +6,7 @@ use App\Models\HealthMinistry;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class HealthMinistryController extends Controller
 {
@@ -37,46 +38,47 @@ class HealthMinistryController extends Controller
     public function store(Request $request)
 {
     $request->validate([
-        'name' => 'required|string|max:255',
+        'health_ministry_name' => 'required|string|max:255', // اسم الوزارة مطلوب
         'phone' => 'required|string|max:15|unique:health_ministry,phone',
         'email' => 'required|string|email|max:255|unique:users,email',
         'password' => 'required|string|min:6',
     ]);
 
     try {
-        \DB::beginTransaction(); // بدء معاملة لحفظ البيانات بأمان
+        DB::beginTransaction(); // بدء المعاملة
 
-        // إنشاء المستخدم أولًا
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'user_type' => 'admin',
-            'is_active' => 1,
-        ]);
-
-        if (!$user) {
-            \DB::rollBack(); // إلغاء العملية إذا فشل إنشاء المستخدم
-            return response()->json(['message' => 'Failed to create user'], 500);
-        }
-
-        // إنشاء وزارة الصحة وربطها بالمستخدم
+        // إنشاء وزارة الصحة بدون user_id في البداية
         $health_ministry = HealthMinistry::create([
-            'name' => $request->name,
+            'health_ministry_name' => $request->health_ministry_name,
             'phone' => $request->phone,
-            'user_id' => $user->user_id, // ربط وزارة الصحة بالمستخدم
         ]);
 
         if (!$health_ministry) {
-            \DB::rollBack(); // إلغاء العملية إذا فشل إنشاء الوزارة
+            DB::rollBack();
             return response()->json(['message' => 'Failed to create health ministry'], 500);
         }
 
-        // تحديث المستخدم وإضافة health_ministry_id
-        $user->health_ministry_id = $health_ministry->health_ministry_id;
-        $user->save();
+        // إنشاء المستخدم وربطه بمعرف الوزارة
+        $user = User::create([
+            'name' => $request->health_ministry_name, // ✅ إضافة الاسم هنا
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'user_type' => 'healthMinistry',
+            'is_active' => 1,
+            'health_ministry_id' => $health_ministry->health_ministry_id, // ربط الوزارة بالمستخدم
+        ]);
 
-        \DB::commit(); // تأكيد حفظ البيانات
+        if (!$user) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to create user'], 500);
+        }
+
+        // تحديث وزارة الصحة بمعرف المستخدم بعد إنشائه
+        $health_ministry->update([
+            'user_id' => $user->user_id
+        ]);
+
+        DB::commit(); // تأكيد العملية
 
         return response()->json([
             'message' => 'Health Ministry added successfully',
@@ -84,7 +86,7 @@ class HealthMinistryController extends Controller
             'user' => $user
         ], 201);
     } catch (\Exception $e) {
-        \DB::rollBack(); // التراجع في حالة حدوث خطأ
+        DB::rollBack();
         return response()->json(['message' => 'Something went wrong', 'error' => $e->getMessage()], 500);
     }
 }
@@ -102,11 +104,11 @@ class HealthMinistryController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
+            'health_ministry_name' => 'required|string|max:255', // تحديث الاسم مطلوب
             'phone' => "required|string|max:15|unique:health_ministry,phone,{$id},health_ministry_id",
         ]);
 
-        $ministry->update($request->all());
+        $ministry->update($request->only(['health_ministry_name', 'phone'])); // تحديث الاسم والهاتف
 
         return response()->json(['message' => 'Health Ministry updated successfully', 'ministry' => $ministry], 200);
     }

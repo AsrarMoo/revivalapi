@@ -4,28 +4,21 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+return new class extends Migration {
+    public function up()
     {
-        Schema::create('medical_tips', function (Blueprint $table) {
-            $table->increments('tip_id');
-            $table->unsignedInteger('doctor_id')->index('fk_tip_doctor');
-            $table->string('title');
+        Schema::create('tips', function (Blueprint $table) {
+            $table->id('tip_id');
+            $table->unsignedBigInteger('doctor_id');
             $table->text('content');
-            $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
+            $table->timestamps();
+
+            $table->foreign('doctor_id')->references('doctor_id')->on('doctors')->onDelete('cascade');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
-        Schema::dropIfExists('medical_tips');
+        Schema::dropIfExists('tips');
     }
 };

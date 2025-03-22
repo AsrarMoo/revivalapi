@@ -13,12 +13,12 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'name' => 'required|string',
+            'email' => 'required|string',
             'password' => 'required|string'
         ]);
 
         // البحث عن المستخدم بالاسم
-        $user = User::where('name', $credentials['name'])->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         // التحقق من صحة البيانات
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
