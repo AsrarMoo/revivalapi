@@ -7,15 +7,9 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController};
-use App\Services\FirebaseService;
 
-// ✅ إرسال رمز التحقق عبر Firebase
-Route::post('/send-code', function (Request $request, FirebaseService $firebaseService) {
-    $request->validate([
-        'phone' => 'required|string|regex:/^\\+\\d{1,15}$/',
-    ]);
-    return response()->json(['message' => 'OTP Sent']);
-});
+
+
 
 // ✅ مسارات التحقق عبر OTP
 Route::prefix('otp')->group(function () {
