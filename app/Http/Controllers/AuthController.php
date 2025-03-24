@@ -37,6 +37,7 @@ class AuthController extends Controller
         $redirect_to = $this->getUserRedirect($user->user_type);
 
         return $this->respondWithToken($token, $user->user_type, $redirect_to);
+
     }
 
     // ✅ 2️⃣ دالة إرجاع التوكن مع معلوماته
@@ -55,7 +56,7 @@ class AuthController extends Controller
     protected function getUserRedirect($userType)
     {
         $routes = [
-            'healthMinistry' => '/admin',
+            'healthMinistry' => '/admin.home',
             'doctor' => '/doctorhome',
             'hospital' => '/dashboard/hospital',
             'patient' => '/dashboard/patient'
