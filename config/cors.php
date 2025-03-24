@@ -1,12 +1,12 @@
 <?php
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-    'allowed_methods' => ['*'],
-    'allowed_origins' => ['*'],
+   'paths' => ['*'],
+    'allowed_methods' => ['*'],  // السماح بكل طرق HTTP
+    'allowed_origins' => ['*'],  // السماح بكل المصادر (يمكنك تحديد نطاق معين بدلاً من `*`)
     'allowed_origins_patterns' => [],
-    'allowed_headers' => ['*'],
+    'allowed_headers' => ['*'],  // السماح بكل الهيدرز
     'exposed_headers' => [],
     'max_age' => 0,
-    'supports_credentials' => false,
+    'supports_credentials' => true, // السماح باستخدام الـ Cookies
 ];
 
