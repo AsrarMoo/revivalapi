@@ -31,12 +31,6 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'firebase' => [
-    'credentials' => env('FIREBASE_CREDENTIALS'),
-],
-'firebase' => [
-    'credentials' => storage_path('app\firebase\revival-320d7-firebase-adminsdk-fbsvc-384ddee3e4.json'),
-],
 
 
 
