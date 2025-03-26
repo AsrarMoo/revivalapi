@@ -8,9 +8,6 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController};
 
-
-
-
 // ✅ مسارات التحقق عبر OTP
 Route::prefix('otp')->group(function () {
     Route::post('/send', [OTPController::class, 'sendOTP']);
@@ -27,6 +24,11 @@ Route::prefix('auth')->group(function () {
 // ✅ المسارات المحمية (تتطلب توكن)
 Route::middleware('auth:api')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
+
+    // ✅ عرض بيانات المستخدم
+    Route::get('/user', function (Request $request) {
+        return response()->json($request->user());
+    });
 
     // ✅ إدارة المرضى
     Route::prefix('patients')->group(function () {
@@ -66,9 +68,9 @@ Route::middleware('auth:api')->group(function () {
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
         Route::put('/{id}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
-       
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
     });
+
     //✅ عرض اسماء المستشفيات والاطباء المتاحين 
     Route::get('/doctor-hospital-requests', [HospitalDoctorRequestController::class, 'getDoctorHospitalRequests']);
     Route::get('/doctor-hospitals', [HospitalDoctorRequestController::class, 'getDoctorHospitals']);
@@ -127,23 +129,24 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [SpecialtyController::class, 'update']);
         Route::delete('/{id}', [SpecialtyController::class, 'destroy']);
     });
-    // ✅ إدارة المواعيد
-Route::prefix('schedules')->group(function () {
-    Route::get('/', [ScheduleController::class, 'index']); // جلب جميع المواعيد الخاصة بالطبيب
-    Route::post('/create', [ScheduleController::class, 'store']); // إضافة موعد جديد
-    Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
-    Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
-    Route::post('/review/{id}', [ScheduleController::class, 'reviewSchedule']);
 
-});
-// ✅ إدارة الحجوزات
-Route::prefix('appointments')->group(function () {
-    Route::get('/', [AppointmentController::class, 'index']); // جلب جميع الحجوزات
-    Route::post('/create', [AppointmentController::class, 'store']); // إضافة حجز جديد
-    Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
-    Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
-    Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
-    Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
-    Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
-});
+    // ✅ إدارة المواعيد
+    Route::prefix('schedules')->group(function () {
+        Route::get('/', [ScheduleController::class, 'index']); // جلب جميع المواعيد الخاصة بالطبيب
+        Route::post('/create', [ScheduleController::class, 'store']); // إضافة موعد جديد
+        Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
+        Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
+        Route::post('/review/{id}', [ScheduleController::class, 'reviewSchedule']);
+    });
+
+    // ✅ إدارة الحجوزات
+    Route::prefix('appointments')->group(function () {
+        Route::get('/', [AppointmentController::class, 'index']); // جلب جميع الحجوزات
+        Route::post('/create', [AppointmentController::class, 'store']); // إضافة حجز جديد
+        Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
+        Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
+        Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
+        Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
+        Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
+    });
 });

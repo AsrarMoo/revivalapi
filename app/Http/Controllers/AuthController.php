@@ -67,18 +67,24 @@ class AuthController extends Controller
 
     // ✅ 4️⃣ تجديد التوكن (Refresh Token)
     public function refreshToken()
-    {
-        try {
-            $newToken = JWTAuth::refresh(JWTAuth::getToken());
-            return response()->json([
-                'access_token' => $newToken,
-                'token_type' => 'bearer',
-                'expires_in' => auth()->factory()->getTTL() * 60
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid token'], 401);
+{
+    try {
+        if (!JWTAuth::getToken()) {
+            return response()->json(['message' => 'Token is required'], 400);
         }
+        $newToken = JWTAuth::refresh(JWTAuth::getToken());
+        return response()->json([
+            'access_token' => $newToken,
+            'token_type' => 'bearer',
+            'expires_in' => auth()->factory()->getTTL() * 60
+        ]);
+    } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+        return response()->json(['message' => 'Invalid token'], 401);
+    } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        return response()->json(['message' => 'Token error'], 500);
     }
+}
+
 
     // ✅ 5️⃣ تسجيل خروج المستخدم
     public function logout()

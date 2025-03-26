@@ -1,12 +1,26 @@
 <?php
-return [
-   'paths' => ['*'],
-    'allowed_methods' => ['*'],  // السماح بكل طرق HTTP
-    'allowed_origins' => ['*'],  // السماح بكل المصادر (يمكنك تحديد نطاق معين بدلاً من `*`)
-    'allowed_origins_patterns' => [],
-    'allowed_headers' => ['*'],  // السماح بكل الهيدرز
-    'exposed_headers' => [],
-    'max_age' => 0,
-    'supports_credentials' => true, // السماح باستخدام الـ Cookies
-];
 
+return [
+    'supports_credentials' => true,
+
+    'allowed_origins' => ['*'],
+
+    'allowed_headers' => [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+    ],
+
+    'allowed_methods' => ['*'],  // السماح بجميع أنواع الطلبات (GET, POST, PUT, DELETE, ...)
+
+    'exposed_headers' => [],
+
+    'max_age' => 0,
+
+    'paths' => [
+        'api/*',  // السماح لجميع مسارات الـ API
+        'login',  // السماح لمسار login
+        'register',  // السماح لمسار register
+        'profile',  // السماح لمسار profile
+    ],
+];
