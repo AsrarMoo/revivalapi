@@ -27,7 +27,7 @@ class TipController extends Controller
 
         if (!$doctor) {
             return response()->json([
-                'message' => 'لم يتم العثور على حساب طبيب مرتبط بهذا المستخدم.',
+                'message' => 'يجب أن يكون لديك حساب طبيب لإضافة نصيحة.',
             ], 403);
         }
 
@@ -42,32 +42,29 @@ class TipController extends Controller
             'tip' => [
                 'tip_id' => $tip->tip_id,
                 'content' => $tip->content,
-                'doctor_name' => $doctor->doctor_name, // ✅ إرجاع اسم الطبيب بدلًا من المعرف
+                'doctor_name' => $doctor->doctor_name, // ✅ إرجاع اسم الطبيب
             ]
         ], 201);
     }
 
-    // ✅ عرض النصائح (كل النصائح أو نصائح الطبيب فقط)
+    // ✅ عرض جميع النصائح أو نصائح الطبيب فقط
     public function index(Request $request)
     {
-        $doctorId = auth()->user()->doctor_id;
+        $user = auth()->user();
+        $doctorId = $user->doctor->doctor_id ?? null;
 
-        if ($request->has('my_tips') && $request->my_tips == true) {
-            // 🔹 جلب نصائح الطبيب فقط مع اسم الطبيب
-            $tips = Tip::where('doctor_id', $doctorId)
-                ->with('doctor:doctor_id,doctor_name') // 🔹 جلب الاسم فقط
-                ->get();
-        } else {
-            // 🔹 جلب كل النصائح مع اسم الطبيب
-            $tips = Tip::with('doctor:doctor_id,doctor_name')->get();
-        }
+        $tips = Tip::with('doctor:doctor_id,doctor_name')
+            ->when($request->has('my_tips') && $request->my_tips == true, function ($query) use ($doctorId) {
+                return $query->where('doctor_id', $doctorId);
+            })
+            ->get();
 
         return response()->json([
             'tips' => $tips->map(function ($tip) {
                 return [
                     'tip_id' => $tip->tip_id,
                     'content' => $tip->content,
-                    'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف', // ✅ اسم الطبيب
+                    'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف',
                 ];
             })
         ], 200);
@@ -76,60 +73,50 @@ class TipController extends Controller
     // ✅ عرض نصيحة معينة
     public function show($id)
     {
-        $tip = Tip::with('doctor:doctor_id,doctor_name')->find($id);
-
-        if (!$tip) {
-            return response()->json(['message' => 'النصيحة غير موجودة'], 404);
-        }
+        $tip = Tip::with('doctor:doctor_id,doctor_name')->findOrFail($id);
 
         return response()->json([
             'tip' => [
-                'id' => $tip->id,
+                'tip_id' => $tip->tip_id,
                 'content' => $tip->content,
-                'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف', // ✅ اسم الطبيب
+                'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف',
             ]
         ], 200);
     }
 
-    // ✅ تعديل نصيحة (الطبيب يستطيع تعديل نصائحه فقط)
+    // ✅ تعديل نصيحة (يجب أن يكون المستخدم صاحب النصيحة)
     public function update(Request $request, $id)
     {
-        $tip = Tip::find($id);
-
-        if (!$tip) {
-            return response()->json(['message' => 'النصيحة غير موجودة'], 404);
-        }
-
-        if ($tip->doctor_id !== auth()->user()->doctor_id) {
-            return response()->json(['message' => 'غير مصرح لك بتعديل هذه النصيحة'], 403);
-        }
-
         $request->validate([
             'content' => 'required|string',
         ]);
+
+        $tip = Tip::findOrFail($id);
+        $user = auth()->user();
+
+        if ($tip->doctor_id !== ($user->doctor->doctor_id ?? null)) {
+            return response()->json(['message' => 'غير مصرح لك بتعديل هذه النصيحة'], 403);
+        }
 
         $tip->update(['content' => $request->content]);
 
         return response()->json([
             'message' => 'تم تعديل النصيحة بنجاح',
             'tip' => [
-                'id' => $tip->id,
+                'tip_id' => $tip->tip_id,
                 'content' => $tip->content,
-                'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف', // ✅ اسم الطبيب
+                'doctor_name' => $tip->doctor->doctor_name ?? 'غير معروف',
             ]
         ], 200);
     }
 
-    // ✅ حذف نصيحة (الطبيب يستطيع حذف نصائحه فقط)
+    // ✅ حذف نصيحة (يجب أن يكون المستخدم صاحب النصيحة)
     public function destroy($id)
     {
-        $tip = Tip::find($id);
+        $tip = Tip::findOrFail($id);
+        $user = auth()->user();
 
-        if (!$tip) {
-            return response()->json(['message' => 'النصيحة غير موجودة'], 404);
-        }
-
-        if ($tip->doctor_id !== auth()->user()->doctor_id) {
+        if ($tip->doctor_id !== ($user->doctor->doctor_id ?? null)) {
             return response()->json(['message' => 'غير مصرح لك بحذف هذه النصيحة'], 403);
         }
 
