@@ -2,7 +2,7 @@
 /node_modules
 /public/build
 /public/hot
-/storage/firebase/revival-320d7-firebase-adminsdk-fbsvc-47630cc134.json/*.json
+/storage/firebase/*.json
 
 /storage/*.key
 /vendor
