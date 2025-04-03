@@ -10,6 +10,8 @@ use App\Models\Doctor;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
+use App\Models\PendingDoctor;
+use Illuminate\Support\Facades\Mail;
 
 class DoctorController extends Controller
 {
@@ -17,6 +19,111 @@ class DoctorController extends Controller
     {
         $this->middleware('auth:api', ['except' => ['register', 'index', 'show']]);
     }
+   
+    
+    public function registerDoctor(Request $request)
+{
+    $validatedData = $request->validate([
+        'doctor_name'         => 'required|string|max:255',
+        'email'               => 'required|email|unique:pending_doctors,email',
+        'password'            => 'required|min:6',
+        'phone'               => 'required|string|max:15|unique:pending_doctors,phone',
+        'gender'              => 'required|in:Male,Female',
+        'specialty_id'        => 'required|integer|exists:specialties,specialty_id',
+        'qualification'       => 'required|string|max:255',
+        'experience'          => 'required|integer|min:0',
+        'bio'                 => 'nullable|string',
+        'license'             => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        'certificate'         => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        'image'               => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+    ]);
+
+    return DB::transaction(function () use ($validatedData, $request) {
+        // ✅ حفظ الملفات
+        $licensePath = $request->file('license')->store('doctor_licenses', 'public');
+        $certificatePath = $request->hasFile('certificate') ? 
+                           $request->file('certificate')->store('doctor_certificates', 'public') : null;
+        $imagePath = $request->hasFile('image') ? 
+                     $request->file('image')->store('doctor_images', 'public') : null;
+
+        // ✅ حفظ الطلب في pending_doctors
+        $pendingDoctor = PendingDoctor::create([
+            'doctor_name'    => $validatedData['doctor_name'],
+            'email'          => $validatedData['email'],
+            'phone'          => $validatedData['phone'],
+            'gender'         => $validatedData['gender'],
+            'specialty_id'   => $validatedData['specialty_id'],
+            'qualification'  => $validatedData['qualification'],
+            'experience'     => $validatedData['experience'],
+            'bio'            => $validatedData['bio'] ?? null,
+            'license_path'   => $licensePath,
+            'certificate_path' => $certificatePath,
+            'image_path'     => $imagePath,
+            'status'         => 'pending',
+        ]);
+
+        // ✅ إرسال إشعار إلى وزارة الصحة
+        DB::table('notifications')->insert([
+            'user_id' => 1, // استبدله بـ ID حساب وزارة الصحة
+            'type'    => 'doctor_registration',
+            'message' => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['doctor_name']}",
+            'is_read' => 0,
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'تم إرسال طلبك إلى الوزارة. سيتم إعلامك عند الموافقة.',
+            'pending_doctor' => $pendingDoctor,
+        ], 201);
+    });
+}
+
+
+public function approveDoctor($id)
+{
+    return DB::transaction(function () use ($id) {
+        $pendingDoctor = PendingDoctor::findOrFail($id);
+
+        // ✅ إنشاء مستخدم جديد في users
+        $user = User::create([
+            'email'    => $pendingDoctor->email,
+            'password' => Hash::make('DefaultPassword123'), // يمكن تغييره لاحقًا
+            'user_type'=> 'doctor',
+        ]);
+
+        // ✅ إنشاء حساب الطبيب في doctors
+        $doctor = Doctor::create([
+            'doctor_name'         => $pendingDoctor->doctor_name,
+            'doctor_phone'        => $pendingDoctor->phone,
+            'doctor_image'        => $pendingDoctor->image_path,
+            'doctor_gender'       => $pendingDoctor->gender,
+            'specialty_id'        => $pendingDoctor->specialty_id,
+            'doctor_qualification'=> $pendingDoctor->qualification,
+            'doctor_experience'   => $pendingDoctor->experience,
+            'doctor_bio'          => $pendingDoctor->bio,
+            'user_id'             => $user->user_id,
+        ]);
+
+        // ✅ تحديث user_id في جدول users
+        $user->update(['doctor_id' => $doctor->doctor_id]);
+
+        // ✅ حذف السجل من pending_doctors
+        $pendingDoctor->delete();
+
+        // ✅ إرسال بريد إلكتروني للطبيب عند الموافقة
+        Mail::raw("تمت الموافقة على تسجيلك كطبيب في النظام. يمكنك الآن تسجيل الدخول.", function ($message) use ($pendingDoctor) {
+            $message->to($pendingDoctor->email)
+                    ->subject('تمت الموافقة على حسابك');
+        });
+
+        return response()->json([
+            'message' => 'تمت الموافقة على الطبيب بنجاح!',
+            'doctor'  => $doctor,
+            'user'    => $user,
+        ]);
+    });
+}
+
 
  // ✅ جلب جميع الأطباء مع اسم التخصص
 public function index()
@@ -70,7 +177,7 @@ public function show()
 
 
     // ✅ تسجيل طبيب جديد
-    public function register(Request $request)
+    public function create(Request $request)
     {
         $validatedData = $request->validate([
             'doctor_name'         => 'required|string|max:255',
@@ -256,149 +363,5 @@ public function getProfile()
     
 
 
-
-    public function profile()
-    {
-        try {
-            // 🔹 جلب بيانات المستخدم من التوكن
-            $user = auth()->user();
-    
-            // لوج: تأكد من أن المستخدم مسجل كـ "طبيب"
-            Log::debug('تم جلب التوكن للمستخدم:', ['user_id' => $user->user_id]);
-    
-            // 🔹 التحقق من أن المستخدم مسجل كـ "طبيب"
-            if ($user->user_type !== 'doctor') {
-                Log::debug('المستخدم ليس طبيبًا', ['user_id' => $user->user_id]);
-                return response()->json(['error' => 'المستخدم ليس طبيبًا'], 403);
-            }
-    
-            // 🔹 جلب بيانات الطبيب من جدول doctors باستخدام user_id
-            $doctor = Doctor::with('specialty')->where('user_id', $user->user_id)->first();
-            
-            // لوج: إذا لم يتم العثور على الطبيب
-            if (!$doctor) {
-                Log::debug('لم يتم العثور على الطبيب باستخدام user_id', ['user_id' => $user->user_id]);
-                return response()->json(['error' => 'لم يتم العثور على الطبيب'], 404);
-            }
-    
-            // ✅ إرجاع بيانات الطبيب مع التخصص
-            Log::debug('تم العثور على الطبيب:', ['doctor' => $doctor]);
-    
-            return response()->json([
-                'doctor_name' => $doctor->doctor_name,
-                'doctor_gender' => $doctor->doctor_gender,
-                'specialty' => $doctor->specialty,
-                'doctor_qualification' => $doctor->doctor_qualification,
-                'doctor_experience' => $doctor->doctor_experience,
-                'doctor_phone' => $doctor->doctor_phone,
-                'doctor_bio' => $doctor->doctor_bio,
-                'doctor_image' => $doctor->doctor_image,
-            ], 200);
-    
-        } catch (\Exception $e) {
-            Log::error('حدث خطأ أثناء جلب بيانات الملف الشخصي', [
-                'error_message' => $e->getMessage(),
-                'stack_trace' => $e->getTraceAsString()
-            ]);
-    
-            return response()->json([
-                'error' => 'حدث خطأ أثناء جلب بيانات الملف الشخصي',
-                'details' => $e->getMessage(),
-            ], 500);
-        }
-    }
-    public function createDoctorAccount(Request $request)
-{
-    // ✅ التحقق من البيانات المدخلة
-    $validatedData = $request->validate([
-        'doctor_name'         => 'required|string|max:255',
-        'email'               => 'required|email|unique:users,email',
-        'password'            => 'required|min:6',
-        'doctor_phone'        => 'required|string|max:15|unique:doctors,doctor_phone',
-        'doctor_image'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-        'doctor_gender'       => 'required|in:Male,Female',
-        'specialty_id'        => 'required|integer|exists:specialties,specialty_id',
-        'doctor_qualification'=> 'required|string|max:255',
-        'doctor_experience'   => 'required|integer|min:0',
-        'doctor_bio'          => 'nullable|string',
-        'attachment'          => 'nullable|file|mimes:pdf,doc,docx,jpg,png|max:2048',  // إضافة التحقق من المرفقات
-    ]);
-
-    // ✅ إرسال طلب الموافقة إلى وزارة الصحة
-    $healthMinistryApproval = $this->requestHealthMinistryApproval($validatedData);
-
-    if (!$healthMinistryApproval) {
-        return response()->json([
-            'message' => 'تم رفض طلبك من وزارة الصحة. يرجى المحاولة لاحقًا.',
-        ], 400);
-    }
-
-    // ✅ بدء المعاملة مع قاعدة البيانات فقط بعد الموافقة
-    return DB::transaction(function () use ($validatedData, $request) {
-
-        // ✅ حفظ المستخدم في جدول users
-        $user = User::create([
-            'email'     => $validatedData['email'],
-            'password'  => Hash::make($validatedData['password']),
-            'user_type' => 'doctor',
-        ]);
-
-        // ✅ تحميل الصورة إن وجدت
-        $imagePath = null;
-        if ($request->hasFile('doctor_image')) {
-            $imagePath = $request->file('doctor_image')->store('doctor_images', 'public');
-        }
-
-        // ✅ تحميل المرفق إن وجد
-        $attachmentPath = null;
-        if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('doctor_attachments', 'public');
-        }
-
-        // ✅ حفظ الطبيب في جدول doctors
-        $doctor = Doctor::create([
-            'doctor_name'         => $validatedData['doctor_name'],
-            'doctor_phone'        => $validatedData['doctor_phone'],
-            'doctor_image'        => $imagePath,
-            'doctor_gender'       => $validatedData['doctor_gender'],
-            'specialty_id'        => $validatedData['specialty_id'],
-            'doctor_qualification'=> $validatedData['doctor_qualification'],
-            'doctor_experience'   => $validatedData['doctor_experience'],
-            'doctor_bio'          => $validatedData['doctor_bio'] ?? null,
-            'attachment'          => $attachmentPath,  // حفظ المرفق
-            'user_id'             => $user->user_id,
-        ]);
-
-        // ✅ توليد JWT Token للمستخدم
-        $token = JWTAuth::fromUser($user);
-
-        // ✅ إرسال إشعار لوزارة الصحة
-        $this->sendNotificationToHealthMinistry($doctor);
-
-        // ✅ إرجاع بيانات الطبيب مع التوكن
-        return response()->json([
-            'message' => 'تم إنشاء حساب الطبيب بنجاح',
-            'doctor'  => $doctor,
-            'user'    => $user,
-            'token'   => $token,
-        ], 201);
-    });
 }
-
-/**
- * دالة محاكاة إرسال إشعار لوزارة الصحة
- */
-private function sendNotificationToHealthMinistry($doctor)
-{
-    // إضافة إشعار إلى جدول الشهادات أو التنبيهات
-    $notification = new Notification([
-        'recipient'   => 'وزارة الصحة',
-        'message'     => "تم رفع مرفق من الطبيب: {$doctor->doctor_name} كتوثيق.",
-        'status'      => 'unread', // حالة الإشعار
-        'created_at'  => now(),
-    ]);
-
-    $notification->save();
-}
-
-}
+  

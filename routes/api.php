@@ -21,11 +21,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [PatientController::class, 'register']); // تسجيل مريض
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
-   // Route لتسجيل الطبيب
-Route::post('/doctor/register', [DoctorController::class, 'registerDoctor']);
+    Route::post('/doctor/register', [DoctorRegistrationController::class, 'registerDoctor']);
 
-// Route لموافقة وزارة الصحة على الطبيب
-Route::post('/doctor/approve/{id}', [DoctorController::class, 'approveDoctor']);
+
 });
 
 // ✅ المسارات المحمية (تتطلب توكن)
@@ -43,11 +41,12 @@ Route::middleware('auth:api')->group(function () {
 
     // ✅ إدارة الأطباء
     Route::prefix('doctors')->group(function () {
-        Route::post('/register', [DoctorController::class, 'register']);
+        Route::post('/create', [DoctorController::class, 'create']);
         Route::get('/', [DoctorController::class, 'index']);
         Route::get('/profile', [DoctorController::class, 'show']);
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
+        Route::post('/approve/{id}', [DoctorRegistrationController::class, 'approveDoctor']);
        
 
         

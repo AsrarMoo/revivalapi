@@ -217,6 +217,36 @@ public function getUserNotificationsview()
     
         return response()->json(['message' => 'تم حذف الإشعار بنجاح']);
     }
+    public function getMinistryNotifications()
+{
+    // التحقق من أن المستخدم من نوع وزارة الصحة
+    if (Auth::user()->user_type !== 'healthMinistry') {
+        return response()->json([
+            'message' => 'غير مصرح لك بهذه الإشعارات',
+            'allowed_user_types' => ['healthMinistry']
+        ], 403);
+    }
+
+    $notifications = Notification::where('user_id', Auth::id())
+        ->where('type', 'doctor_approval')
+        ->orderBy('created_at', 'desc')
+        ->get()
+        ->map(function ($notification) {
+            return [
+                'id' => $notification->notification_id,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'metadata' => json_decode($notification->metadata, true),
+                'created_at' => $notification->created_at->format('Y-m-d H:i'),
+                'is_read' => (bool)$notification->is_read
+            ];
+        });
+
+    return response()->json([
+        'count' => $notifications->count(),
+        'notifications' => $notifications
+    ]);
+}
     
 }
       

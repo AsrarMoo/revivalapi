@@ -76,7 +76,7 @@ class AuthController extends Controller
             'healthMinistry' => '/admin',
             'doctor' => '/doctorhome',
             'hospital' => '/hospital',
-            'patient' => '/PATIENTHOMESCREEN'
+            'patient' => '/PatientHomeScreen'
         ];
 
         return $routes[$userType] ?? '/dashboard';

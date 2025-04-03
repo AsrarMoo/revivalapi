@@ -31,11 +31,18 @@ return [
   'disks' => [
     'public' => [
         'driver' => 'local',
-        'root' => storage_path('app/public_photo'),
+        'root' => storage_path('app/public'),
         'url' => env('APP_URL').'/storage',
         'visibility' => 'public',
     ],
 ],
+'disks' => [
+    'temp' => [
+        'driver' => 'local',
+        'root' => storage_path('app/temp'), // المسار التلقائي
+    ],
+],
+
 
         'public' => [
             'driver' => 'local',
