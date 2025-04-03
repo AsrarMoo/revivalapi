@@ -28,13 +28,14 @@ return [
     |
     */
 
-    'disks' => [
-
-        'local' => [
-            'driver' => 'local',
-            'root' => storage_path('app'),
-            'throw' => false,
-        ],
+  'disks' => [
+    'public' => [
+        'driver' => 'local',
+        'root' => storage_path('app/public_photo'),
+        'url' => env('APP_URL').'/storage',
+        'visibility' => 'public',
+    ],
+],
 
         'public' => [
             'driver' => 'local',
@@ -56,7 +57,7 @@ return [
             'throw' => false,
         ],
 
-    ],
+    
 
     /*
     |--------------------------------------------------------------------------

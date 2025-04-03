@@ -16,6 +16,7 @@ class Doctor extends Model
         'doctor_name', 'specialty_id', 'doctor_qualification',
         'doctor_experience', 'doctor_phone', 'doctor_bio',
         'doctor_image', 'doctor_gender','user_id'
+        
     ];
 
     // علاقة مع المستخدم

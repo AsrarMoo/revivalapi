@@ -7,6 +7,7 @@ use App\Models\Hospital;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
@@ -31,10 +32,10 @@ class ScheduleController extends Controller
                     'doctor_name' => $schedule->doctor->doctor_name ?? 'غير معروف',
                     'hospital_name' => $schedule->hospital->hospital_name ?? 'غير معروف',
                     'day_of_week' => $schedule->day_of_week,
-                    'start_time' => $schedule->start_time,
-                    'end_time' => $schedule->end_time,
-                    'proposed_start_time' => $schedule->proposed_start_time,
-                    'proposed_end_time' => $schedule->proposed_end_time,
+                   'start_time' => Carbon::parse($schedule->start_time)->format('H:i'),
+                    'end_time' => Carbon::parse($schedule->end_time)->format('H:i'),
+                  //  'proposed_start_time' => $schedule->proposed_start_time,
+                    //'proposed_end_time' => $schedule->proposed_end_time,
                     'status' => $schedule->status,
                     'created_at' => $schedule->created_at,
                     'updated_at' => $schedule->updated_at,
@@ -44,6 +45,40 @@ class ScheduleController extends Controller
         return response()->json($schedules);
     }
     
+// 🔹 عرض تفاصيل موعد معين
+public function show($id)
+{
+    $schedule = Schedule::where('schedule_id', $id)
+    ->with([
+        'doctor' => function ($query) {
+            $query->select('doctor_id', 'doctor_name');
+        },
+        'hospital' => function ($query) {
+            $query->select('hospital_id', 'hospital_name');
+        }
+    ])
+    ->first();
+
+if (!$schedule) {
+    return response()->json(['error' => 'لم يتم العثور على الموعد'], 404);
+}
+
+
+    // إذا تم العثور على الموعد، إرجاع تفاصيله
+    return response()->json([
+        'schedule_id' => $schedule->schedule_id,
+        'doctor_name' => $schedule->doctor->doctor_name ?? 'غير معروف',
+        'hospital_name' => $schedule->hospital->hospital_name ?? 'غير معروف',
+        'day_of_week' => $schedule->day_of_week,
+       'start_time' => Carbon::parse($schedule->start_time)->format('H:i'),
+        'end_time' => Carbon::parse($schedule->end_time)->format('H:i'),
+      //  'proposed_start_time' => $schedule->proposed_start_time,
+      //  'proposed_end_time' => $schedule->proposed_end_time,
+        'status' => $schedule->status,
+        'created_at' => $schedule->created_at,
+        'updated_at' => $schedule->updated_at,
+    ]);
+}
 
     // 🔹 إضافة موعد جديد
     public function store(Request $request)
@@ -59,8 +94,9 @@ class ScheduleController extends Controller
             'doctor_id' => auth()->user()->doctor_id,
             'hospital_id' => $request->hospital_id,
             'day_of_week' => $request->day_of_week,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
+            'start_time' => Carbon::parse($request->start_time)->format('H:i'),
+            'end_time' => Carbon::parse($request->end_time)->format('H:i'),
+
             'status' => 'available',
         ]);
 
@@ -168,4 +204,22 @@ class ScheduleController extends Controller
         $schedule->delete();
         return response()->json(['message' => 'تم حذف الموعد بنجاح']);
     }
+
+
+  
+    public function getDoctorHospitals(Request $request)
+    {
+        $doctorId = auth()->user()->doctor_id;
+        Log::info('Doctor ID: ' . $doctorId); // تحقق من القيمة
+        
+        $hospitals = DB::table('hospital_doctors')
+            ->join('hospitals', 'hospital_doctors.hospital_id', '=', 'hospitals.hospital_id')
+            ->where('hospital_doctors.doctor_id', $doctorId)
+            ->select('hospitals.hospital_name')
+            ->get();
+    
+        return response()->json($hospitals);
+    }
+    
+    
 }

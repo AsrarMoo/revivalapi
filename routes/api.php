@@ -6,12 +6,14 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
     HospitalController, HealthMinistryController, UserController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
-      HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController};
+      HospitalDoctorRequestApprovalController ,DoctorRegistrationController, ScheduleController ,AppointmentController};
+
 
 // ✅ مسارات التحقق عبر OTP
 Route::prefix('otp')->group(function () {
     Route::post('/send', [OTPController::class, 'sendOTP']);
     Route::post('/verify', [OTPController::class, 'verifyOTP']);
+   
 });
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -19,16 +21,16 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [PatientController::class, 'register']); // تسجيل مريض
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
+   // Route لتسجيل الطبيب
+Route::post('/doctor/register', [DoctorController::class, 'registerDoctor']);
+
+// Route لموافقة وزارة الصحة على الطبيب
+Route::post('/doctor/approve/{id}', [DoctorController::class, 'approveDoctor']);
 });
 
 // ✅ المسارات المحمية (تتطلب توكن)
 Route::middleware('auth:api')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
-
-    // ✅ عرض بيانات المستخدم
-    Route::get('/user', function (Request $request) {
-        return response()->json($request->user());
-    });
 
     // ✅ إدارة المرضى
     Route::prefix('patients')->group(function () {
@@ -43,10 +45,14 @@ Route::middleware('auth:api')->group(function () {
     Route::prefix('doctors')->group(function () {
         Route::post('/register', [DoctorController::class, 'register']);
         Route::get('/', [DoctorController::class, 'index']);
-        Route::get('/{id}', [DoctorController::class, 'show']);
+        Route::get('/profile', [DoctorController::class, 'show']);
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
-    });
+       
+
+        
+
+    }); //Route::get('/profile', [DoctorController::class, 'profile']);
 
     // ✅ إدارة المستشفيات
     Route::prefix('hospitals')->group(function () {
@@ -68,9 +74,9 @@ Route::middleware('auth:api')->group(function () {
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
         Route::put('/{id}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
+       
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
     });
-
     //✅ عرض اسماء المستشفيات والاطباء المتاحين 
     Route::get('/doctor-hospital-requests', [HospitalDoctorRequestController::class, 'getDoctorHospitalRequests']);
     Route::get('/doctor-hospitals', [HospitalDoctorRequestController::class, 'getDoctorHospitals']);
@@ -129,24 +135,25 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [SpecialtyController::class, 'update']);
         Route::delete('/{id}', [SpecialtyController::class, 'destroy']);
     });
-
     // ✅ إدارة المواعيد
-    Route::prefix('schedules')->group(function () {
-        Route::get('/', [ScheduleController::class, 'index']); // جلب جميع المواعيد الخاصة بالطبيب
-        Route::post('/create', [ScheduleController::class, 'store']); // إضافة موعد جديد
-        Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
-        Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
-        Route::post('/review/{id}', [ScheduleController::class, 'reviewSchedule']);
-    });
-
-    // ✅ إدارة الحجوزات
-    Route::prefix('appointments')->group(function () {
-        Route::get('/', [AppointmentController::class, 'index']); // جلب جميع الحجوزات
-        Route::post('/create', [AppointmentController::class, 'store']); // إضافة حجز جديد
-        Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
-        Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
-        Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
-        Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
-        Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
-    });
+Route::prefix('schedules')->group(function () {
+    Route::get('/', [ScheduleController::class, 'index']); // جلب جميع المواعيد الخاصة بالطبيب
+    Route::post('/create', [ScheduleController::class, 'store']); // إضافة موعد جديد
+    Route::get('/doctor/hospitals', [ScheduleController::class, 'getDoctorHospitals']);
+    Route::get('/{id}', [ScheduleController::class, 'show']);//عرض تفاصيل موعد معين
+    Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
+    Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
+    Route::post('/review/{id}', [ScheduleController::class, 'reviewSchedule']);
+   
+});
+// ✅ إدارة الحجوزات
+Route::prefix('appointments')->group(function () {
+    Route::get('/', [AppointmentController::class, 'index']); // جلب جميع الحجوزات
+    Route::post('/create', [AppointmentController::class, 'store']); // إضافة حجز جديد
+    Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
+    Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
+    Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
+    Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
+    Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
+});
 });

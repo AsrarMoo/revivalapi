@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('doctor_phone', 15)->unique();
             $table->text('doctor_bio')->nullable();
             $table->string('doctor_image')->nullable();
+            $table->string('attachment')->nullable(); // حقل المرفقات
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
 

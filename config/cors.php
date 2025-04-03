@@ -1,26 +1,10 @@
 <?php
-
 return [
-    'supports_credentials' => true,
-
-    'allowed_origins' => ['*'],
-
-    'allowed_headers' => [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-    ],
-
-    'allowed_methods' => ['*'],  // السماح بجميع أنواع الطلبات (GET, POST, PUT, DELETE, ...)
-
+    'paths' => ['*'], // تأكد من أن مسارات API مضمنة
+    'allowed_methods' => ['*'], // أو حدد الأساليب المسموحة مثل ['GET', 'POST', 'PUT', 'DELETE']
+    'allowed_origins' => ['http://127.0.0.1:8000'], // تأكد من تضمين رابط المتصفح
+    'allowed_headers' => ['*'], // السماح لجميع الهيدرات
     'exposed_headers' => [],
-
     'max_age' => 0,
-
-    'paths' => [
-        'api/*',  // السماح لجميع مسارات الـ API
-        'login',  // السماح لمسار login
-        'register',  // السماح لمسار register
-        'profile',  // السماح لمسار profile
-    ],
+    'supports_credentials' => true,
 ];
