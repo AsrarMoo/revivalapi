@@ -2,7 +2,7 @@
 /node_modules
 /public/build
 /public/hot
-/storge/firebase
+/storage/firebase/revival-320d7-firebase-adminsdk-fbsvc-47630cc134.json/*.json
 
 /storage/*.key
 /vendor
@@ -17,4 +17,5 @@ npm-debug.log
 yarn-error.log
 /.fleet
 /.idea
+
 /.vscode
