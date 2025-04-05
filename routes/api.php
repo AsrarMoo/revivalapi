@@ -6,24 +6,17 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
     HospitalController, HealthMinistryController, UserController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
-      HospitalDoctorRequestApprovalController ,DoctorRegistrationController, ScheduleController ,AppointmentController};
+      HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
+      MedicalRecordController,MedicationController,TestController};
 
-
-// ✅ مسارات التحقق عبر OTP
-Route::prefix('otp')->group(function () {
-    Route::post('/send', [OTPController::class, 'sendOTP']);
-    Route::post('/verify', [OTPController::class, 'verifyOTP']);
-   
-});
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
 Route::prefix('auth')->group(function () {
     Route::post('/register', [PatientController::class, 'register']); // تسجيل مريض
     Route::post('/login', [AuthController::class, 'login']);
+   
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
-    Route::post('/doctor/register', [DoctorRegistrationController::class, 'registerDoctor']);
-
-
+    Route::post('/registerdoctor', [DoctorController::class, 'registerDoctor']);
 });
 
 // ✅ المسارات المحمية (تتطلب توكن)
@@ -46,7 +39,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/profile', [DoctorController::class, 'show']);
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
-        Route::post('/approve/{id}', [DoctorRegistrationController::class, 'approveDoctor']);
+        Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
+
        
 
         
@@ -101,11 +95,13 @@ Route::middleware('auth:api')->group(function () {
 
     // ✅ إدارة النصائح (Tips)
     Route::prefix('tips')->group(function () {
+        Route::get('/tops', [TipController::class, 'toptip']);
         Route::post('/', [TipController::class, 'store']);
         Route::get('/', [TipController::class, 'index']);
         Route::get('/{id}', [TipController::class, 'show']);
         Route::put('/{id}', [TipController::class, 'update']);
         Route::delete('/{id}', [TipController::class, 'destroy']);
+       
     });
 
     // ✅ إدارة متابعة النصائح (Tips)
@@ -113,6 +109,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{tip_id}', [TipLikeController::class, 'likeTip']);
         Route::delete('/{tip_id}', [TipLikeController::class, 'unlikeTip']);
         Route::get('/tips', [TipLikeController::class, 'getTips']);
+      
     });
 
     // ✅ إدارة الإشعارات
@@ -153,6 +150,52 @@ Route::prefix('appointments')->group(function () {
     Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
     Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
     Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
-    Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
+   // Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
+   Route::get('/doctor/appointments', [AppointmentController::class, 'getAppointmentsForDoctor']);
+
+// مسار عرض الحجوزات الخاصة بالمستشفى
+Route::get('/hospital/appointments', [AppointmentController::class, 'getAppointmentsForHospital']);
 });
+
+
+Route::prefix('medical-records')->group(function () {
+   // روت لإنشاء سجل طبي جديد
+   Route::post('/', [MedicalRecordController::class, 'storeMedicalRecordAndTests']);
+   // روت لجلب قائمة أسماء المرضى الخاصة بالمشفى
+   Route::get('/hospital/patient', [MedicalRecordController::class, 'getHospitalPatients']);
+   // روت لجلب تواريخ السجلات الطبية للمريض الخاصة بالمشفى
+   Route::get('/hospital/patient/{patientId}/date', [MedicalRecordController::class, 'getPatientRecordsDates']);
+   // روت لعرض  نفاصيل السجل الطبي للمشفى 
+   Route::get('/hospital/record/{medical_record_id}', [MedicalRecordController::class, 'getHospitalRecordDetails']);
+
+
+   // روت لجلب قائمة أسماء المرضى الخاصة بالطبيب
+   Route::get('/doctor/patient', [MedicalRecordController::class, 'getDoctorPatients']);
+   // روت لجلب تواريخ السجلات الطبية للمريض الخاصة بالطبيب
+   Route::get('/doctor/patient/{patientId}/date', [MedicalRecordController::class, 'getDoctorPatientRecordsDates']);
+   // روت لعرض  نفاصيل السجل الطبي للطبيب 
+   Route::get('/doctor/record/{medical_record_id}', [MedicalRecordController::class, 'getDoctorRecordDetails']);
+
+  
+});
+
+
+
+Route::prefix('medications')->group(function () {
+Route::get('/', [MedicationController::class, 'index']);
+Route::get('/names', [MedicationController::class, 'getMedicationNames']);
+Route::post('/', [MedicationController::class, 'store']);
+Route::put('/{id}', [MedicationController::class, 'update']);
+Route::delete('/{id}', [MedicationController::class, 'destroy']);
+
+});
+
+Route::prefix('tests')->group(function () {
+Route::get('/', [TestController::class, 'index']);
+Route::get('/names', [TestController::class, 'getTestNames']);
+Route::post('/', [TestController::class, 'store']);
+Route::put('/{id}', [TestController::class, 'update']);
+Route::delete('/{id}', [TestController::class, 'destroy']);
+});
+
 });

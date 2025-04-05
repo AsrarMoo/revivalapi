@@ -28,5 +28,11 @@ class Doctor extends Model
 {
     return $this->belongsTo(Specialty::class, 'specialty_id');
 }
+// في نموذج Doctor
+
+public function medicalRecords()
+{
+    return $this->hasMany(MedicalRecord::class, 'doctor_id');
+}
 
 }

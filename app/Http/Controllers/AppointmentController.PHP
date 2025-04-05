@@ -175,6 +175,43 @@ public function sendNotification($userId, $title, $message)
 
     Log::info('✅ تم إنشاء الإشعار بنجاح!');
 }
+public function getAppointmentsForDoctor()
+{
+    // الحصول على التوكن الحالي
+    $user = Auth::user();
+    
+    // التأكد من أن المستخدم هو طبيب
+    $userType = DB::table('users')->where('user_id', $user->user_id)->value('user_type');
+    if ($userType !== 'doctor') {
+        return response()->json(['message' => 'مسموح فقط للأطباء بعرض الحجوزات'], 403);
+    }
+    
+    // الحصول على الحجوزات الخاصة بالطبيب
+    $appointments = Appointment::with(['patient', 'hospital', 'schedule'])
+                               ->where('doctor_id', $user->doctor_id)
+                               ->get();
+    
+    return response()->json($appointments);
+}
+public function getAppointmentsForHospital()
+{
+    // الحصول على التوكن الحالي
+    $user = Auth::user();
+    
+    // التأكد من أن المستخدم هو مستشفى
+    $userType = DB::table('users')->where('user_id', $user->user_id)->value('user_type');
+    if ($userType !== 'hospital') {
+        return response()->json(['message' => 'مسموح فقط للمستشفيات بعرض الحجوزات'], 403);
+    }
+    
+    // الحصول على جميع الحجوزات الخاصة بالمستشفى
+    $appointments = Appointment::with(['patient', 'doctor', 'schedule'])
+                               ->where('hospital_id', $user->hospital_id)
+                               ->get();
+    
+    return response()->json($appointments);
+}
+
 
 
     }

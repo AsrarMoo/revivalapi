@@ -36,12 +36,7 @@ return [
         'visibility' => 'public',
     ],
 ],
-'disks' => [
-    'temp' => [
-        'driver' => 'local',
-        'root' => storage_path('app/temp'), // المسار التلقائي
-    ],
-],
+
 
 
         'public' => [

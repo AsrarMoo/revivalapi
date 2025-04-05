@@ -2,73 +2,111 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
-use App\Models\Patient;
+
+
 use App\Models\User;
+use App\Models\Patient;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Services\SupabaseService; // تأكد من المسار الصحيح
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log; // تأكد من إضافة هذه السطر
+
 
 class PatientController extends Controller
 {
-    public function __construct()
+    protected $supabaseService;
+
+    public function __construct(SupabaseService $supabaseService)
     {
+        $this->supabaseService = $supabaseService;
         $this->middleware('auth:api', ['except' => ['register']]);
     }
-   
-        // ✅ تسجيل مريض جديد
-        public function register(Request $request)
-        {
-            $validatedData = $request->validate([
-                'patient_name'  => 'required|string|max:255',
-                'email'         => 'required|email|unique:users,email',
-                'password'      => 'required|min:6',
-                'patient_phone' => 'required|string|max:15|unique:patients,patient_phone',
-                'patient_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+    public function register(Request $request)
+    {
+        Log::info('بدأت عملية تسجيل المريض');
+    
+        // التحقق من البيانات المدخلة
+        $validatedData = $request->validate([
+            'patient_name'  => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|min:6',
+            'patient_phone' => 'required|string|max:15|unique:patients,patient_phone',
+            'patient_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+    
+        Log::info('البيانات المدخلة تم التحقق منها بنجاح', ['data' => $validatedData]);
+    
+        return DB::transaction(function () use ($validatedData, $request) {
+            Log::info('بدأت عملية حفظ المستخدم في جدول users');
+    
+            // ✅ حفظ المستخدم في جدول users
+            $user = User::create([
+                'email'     => $validatedData['email'],
+                'password'  => Hash::make($validatedData['password']),
+                'user_type' => 'patient',
             ]);
     
-            return DB::transaction(function () use ($validatedData, $request) {
-                // ✅ حفظ المستخدم في جدول users
-                $user = User::create([
-                    //'name'      => $validatedData['patient_name'],
-                    'email'     => $validatedData['email'],
-                    'password'  => Hash::make($validatedData['password']),
-                    'user_type' => 'patient',
-                ]);
+            Log::info('تم حفظ المستخدم في جدول users', ['user' => $user]);
     
-                // ✅ تحميل الصورة إن وجدت
-                $imagePath = null;
-                if ($request->hasFile('patient_image')) {
-                    $imagePath = $request->file('patient_image')->store('patient_images', 'public');
-                }
+            // ✅ تحميل الصورة إن وجدت
+            $imagePath = null;
+            if ($request->hasFile('patient_image')) {
+                Log::info('تم العثور على صورة المريض');
+                $imagePath = $request->file('patient_image')->store('patient_images', 'public');
+            }
     
-                // ✅ حفظ المريض في جدول patients
-                $patient = Patient::create([
-                    'patient_name'  => $validatedData['patient_name'],
-                    'patient_phone' => $validatedData['patient_phone'],
-                    'patient_image' => $imagePath,
-                    'user_id' => $user->user_id,
-                ]);
+            // ✅ حفظ المريض في جدول patients
+            $patient = Patient::create([
+                'patient_name'  => $validatedData['patient_name'],
+                'patient_phone' => $validatedData['patient_phone'],
+                'patient_image' => $imagePath,
+                'user_id' => $user->user_id,
+            ]);
     
-                // ✅ تحديث user_id في جدول users
-                $user->update(['patient_id' => $patient->id]);
+            Log::info('تم حفظ المريض في جدول patients', ['patient' => $patient]);
     
-                // ✅ توليد JWT Token بعد التسجيل
-                $token = JWTAuth::fromUser($user);
-                $user->patient_id = $patient->patient_id;
-                $user->save();
-                return response()->json([
-                    'message' => 'تم تسجيل المريض بنجاح',
-                    'patient' => $patient,
-                    'user'    => $user,
-                    'token'   => $token, // ⬅️ يتم إرجاع التوكن مباشرة
-                ], 201);
-            });
-        }
+            // ✅ تحديث user_id في جدول users
+            $user->update(['patient_id' => $patient->id]);
+    
+            // ✅ توليد JWT Token بعد التسجيل
+            $token = JWTAuth::fromUser($user);
+            $user->patient_id = $patient->patient_id;
+            $user->save();
+    
+            Log::info('تم توليد توكن الـ JWT', ['token' => $token]);
+    
+            // ✅ إرسال رسالة التحقق عبر البريد الإلكتروني باستخدام Supabase
+            Log::info('بدأت عملية إرسال رسالة التحقق عبر البريد الإلكتروني');
+    
+            // استدعاء دالة التسجيل في Supabase
+            // استخدام البيانات المحققة في هذا الجزء
+            $supabaseResponse = $this->supabaseService->signUp(
+                $validatedData['email'], 
+                $validatedData['password'], 
+                $validatedData['patient_phone']
+            );
+    
+            // إذا كانت هناك مشكلة في التسجيل، سجّل الخطأ.
+            if (isset($supabaseResponse['error'])) {
+                Log::error('فشل الاتصال بـ Supabase', ['error' => $supabaseResponse['error']]);
+            } else {
+                Log::info('تم التسجيل بنجاح في Supabase', ['data' => $supabaseResponse['data']]);
+            }
+    
+            Log::info('تم إرسال رسالة التحقق بنجاح عبر البريد الإلكتروني');
+    
+            return response()->json([
+                'message' => 'تم تسجيل المريض بنجاح. تحقق من بريدك الإلكتروني.',
+                'patient' => $patient,
+                'user'    => $user,
+                'token'   => $token,
+            ], 201);
+        });
+    }
     
     
-
 
     // ✅ استعلام عن جميع المرضى
     public function index()

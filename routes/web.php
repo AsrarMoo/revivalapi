@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MedicalRecordController;
 
 Route::get('/', function () {
     return response()->json([
@@ -8,4 +9,5 @@ Route::get('/', function () {
         'status' => 200
     ]);
 });
+
 

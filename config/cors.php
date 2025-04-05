@@ -1,10 +1,11 @@
 <?php
 return [
-    'paths' => ['*'], // تأكد من أن مسارات API مضمنة
-    'allowed_methods' => ['*'], // أو حدد الأساليب المسموحة مثل ['GET', 'POST', 'PUT', 'DELETE']
-    'allowed_origins' => ['http://127.0.0.1:8000'], // تأكد من تضمين رابط المتصفح
-    'allowed_headers' => ['*'], // السماح لجميع الهيدرات
+    'paths' => ['api/*', 'sanctum/csrf-cookie'], // المسارات التي تطبق عليها CORS
+    'allowed_methods' => ['*'], // جميع الـ HTTP Methods مسموحة
+    'allowed_origins' => ['http://127.0.0.1:8000'], // أضف أصولك هنا
+    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'], // جميع الـ Headers مسموحة
     'exposed_headers' => [],
     'max_age' => 0,
-    'supports_credentials' => true,
+    'supports_credentials' => false, // غيّرها لـ `true` إذا كنت تستخدم الكوكيز
 ];

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Schedule;
+
 
 class Appointment extends Model
 {
@@ -39,5 +41,10 @@ class Appointment extends Model
     public function hospital()
     {
         return $this->belongsTo(Hospital::class, 'hospital_id', 'hospital_id');
+    }
+
+    public function schedule()
+    {
+        return $this->belongsTo(Schedule::class, 'schedule_id');
     }
 }

@@ -1,25 +1,29 @@
 <?php
+
 namespace App\Mail;
 
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
 
-class Doctorapproved extends Mailable
+class DoctorApprovedMail extends Mailable
 {
-    public $data;
+    use Queueable, SerializesModels;
 
-    public function __construct(array $data)
+    public $doctorName;
+
+    public function __construct($doctorName)
     {
-        $this->data = $data;
+        $this->doctorName = $doctorName;
     }
 
     public function build()
     {
-        return $this->subject('تمت الموافقة على تسجيلك كطبيب')
-                    ->view('emails.doctor_approved', [
-                        'name' => $this->data['doctor_name'],
-                        'email' => $this->data['email'],
-                        'password' => $this->data['password'],
-                        'loginUrl' => $this->data['login_url']
+        return $this->subject('تمت الموافقة على حسابك كطبيب')
+                    ->view('emails.doctor_approved')
+                    ->with([
+                        'doctorName' => $this->doctorName,
                     ]);
     }
 }

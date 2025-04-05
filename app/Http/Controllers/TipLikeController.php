@@ -38,24 +38,27 @@ class TipLikeController extends Controller {
         return response()->json(['message' => 'تم إلغاء الإعجاب!'], 200);
     }
 
-    // عرض النصائح مرتبة حسب عدد الإعجابات
     public function getTips() {
         $tips = Tip::select(
             'medical_tips.tip_id', 
-            //'medical_tips.title', 
             'medical_tips.content', 
-            'medical_tips.doctor_id', 
+            'doctors.doctor_name',  // ✅ جلب اسم الطبيب
             'medical_tips.created_at'
         )
         ->leftJoin('tip_likes', 'medical_tips.tip_id', '=', 'tip_likes.tip_id')
+        ->leftJoin('doctors', 'medical_tips.doctor_id', '=', 'doctors.doctor_id') // ✅ الربط بجدول الأطباء
         ->selectRaw('COUNT(tip_likes.like_id) as like_count')
-        ->groupBy('medical_tips.tip_id',  'medical_tips.content', 'medical_tips.doctor_id', 'medical_tips.created_at')
+        ->groupBy(
+            'medical_tips.tip_id', 
+            'medical_tips.content', 
+            'doctors.doctor_name', 
+            'medical_tips.created_at'
+        )
         ->orderBy('like_count', 'DESC')
         ->orderBy('medical_tips.created_at', 'DESC')
         ->get();
     
-
-
         return response()->json($tips);
     }
+    
 }

@@ -124,4 +124,5 @@ class TipController extends Controller
 
         return response()->json(['message' => 'تم حذف النصيحة بنجاح'], 200);
     }
-}
+
+}    
