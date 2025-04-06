@@ -12,6 +12,7 @@ use App\Models\Notification;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
 use App\Models\PendingDoctor;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 
 class DoctorController extends Controller
@@ -432,6 +433,42 @@ public function getProfile()
     }
     
 
-
+  
+   
+    
+    public function getHospitals()
+    {
+        try {
+            // 🔹 جلب المستخدم من التوكن
+            $user = auth()->user();
+    
+            // 🔹 التحقق من أن المستخدم طبيب
+            if ($user->user_type !== 'doctor') {
+                return response()->json(['error' => 'المستخدم ليس طبيبًا'], 403);
+            }
+    
+            // 🔹 جلب بيانات الطبيب باستخدام user_id
+            $doctor = Doctor::where('user_id', $user->user_id)->first();
+    
+            // 🔹 التحقق من وجود الطبيب
+            if (!$doctor) {
+                return response()->json(['error' => 'لم يتم العثور على بيانات الطبيب'], 404);
+            }
+    
+            // 🔹 جلب أسماء المستشفيات المرتبطة بالطبيب
+            $hospitalNames = $doctor->hospitals()->pluck('hospital_name');
+    
+            return response()->json([
+                'hospitals' => $hospitalNames
+            ], 200);
+    
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'حدث خطأ أثناء جلب المستشفيات',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
 }
   

@@ -34,5 +34,9 @@ public function medicalRecords()
 {
     return $this->hasMany(MedicalRecord::class, 'doctor_id');
 }
+public function hospitals()
+{
+    return $this->belongsToMany(Hospital::class, 'hospital_doctors', 'doctor_id', 'hospital_id');
+}
 
 }

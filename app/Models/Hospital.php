@@ -17,8 +17,8 @@ class Hospital extends Model
         'hospital_phone',
         'hospital_image',
         'user_id',
-        'latitude',      
-        'longitude' 
+        //'latitude',      
+        //'longitude' 
         
     ];
 

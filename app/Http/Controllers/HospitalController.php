@@ -100,66 +100,83 @@ class HospitalController extends Controller
     // ✅ استعلام عن جميع المستشفيات
     public function index()
     {
-        return response()->json(['hospitals' => Hospital::all()], 200);
+        $hospitals = Hospital::with('user')->get(); // لازم تجيب البيانات أول
+    
+        return response()->json([
+            'hospitals' => $hospitals->map(function ($hospital) {
+                return [
+                    'hospital_id'      => $hospital->hospital_id,
+                    'user_id'          => $hospital->user_id,
+                    'hospital_name'    => $hospital->hospital_name,
+                    'hospital_address' => $hospital->hospital_address,
+                    'hospital_phone'   => $hospital->hospital_phone,
+                    'hospital_image'   => $hospital->hospital_image,
+                    'latitude'         => $hospital->latitude,
+                    'longitude'        => $hospital->longitude,
+                    'email'            => optional($hospital->user)->email, // الإيميل من جدول users
+                ];
+            }),
+        ]);
     }
+    
 
     // ✅ استعلام عن مستشفى معين
     public function show($id)
     {
         $hospital = Hospital::find($id);
         return $hospital ? response()->json(['hospital' => $hospital], 200)
+        
                          : response()->json(['message' => 'المستشفى غير موجود'], 404);
     }
 
-    // ✅ تحديث بيانات المستشفى
-    public function update(Request $request, $id)
-    {
-        try {
-            // البحث عن المستشفى والمستخدم المرتبط به
-            $hospital = Hospital::findOrFail($id);
-            $user = User::findOrFail($hospital->user_id);
-
-            // تحديث صورة المستشفى إذا وُجدت
-            if ($request->hasFile('hospital_image')) {
-                // حذف الصورة القديمة إذا كانت موجودة
-                if ($hospital->hospital_image) {
-                    Storage::disk('public')->delete($hospital->hospital_image);
-                }
-                // حفظ الصورة الجديدة
-                $imagePath = $request->file('hospital_image')->store('hospital_images', 'public');
-                $hospital->hospital_image = $imagePath;
-            }
-
-            // تحديث بيانات المستشفى باستثناء الحقول غير المسموح بتحديثها مباشرة
-            $hospital->fill($request->except(['hospital_image', 'email', 'password']))->save();
-
-            // تحديث بيانات المستخدم المرتبطة بالمستشفى
-            if ($request->has('email')) {
-                $user->email = $request->email;
-            }
-            if ($request->has('password')) {
-                $user->password = bcrypt($request->password);
-            }
-            if ($request->has('hospital_name')) {
-                $user->name = $request->hospital_name;
+     // ✅ تحديث بيانات المستشفى
+     public function update(Request $request, $id)
+     {
+         try {
+             // البحث عن المستشفى والمستخدم المرتبط به
+             $hospital = Hospital::findOrFail($id);
+             $user = User::findOrFail($hospital->user_id);
+ 
+             // تحديث صورة المستشفى إذا وُجدت
+             if ($request->hasFile('hospital_image')) {
+                 // حذف الصورة القديمة إذا كانت موجودة
+                 if ($hospital->hospital_image) {
+                     Storage::disk('public')->delete($hospital->hospital_image);
+                 }
+                 // حفظ الصورة الجديدة
+                 $imagePath = $request->file('hospital_image')->store('hospital_images', 'public');
+                 $hospital->hospital_image = $imagePath;
+             }
+ 
+             // تحديث بيانات المستشفى باستثناء الحقول غير المسموح بتحديثها مباشرة
+             $hospital->fill($request->except(['hospital_image', 'email', 'password']))->save();
+ 
+             // تحديث بيانات المستخدم المرتبطة بالمستشفى
+             if ($request->has('email')) {
+                 $user->email = $request->email;
+             }
+             if ($request->has('password')) {
+                 $user->password = bcrypt($request->password);
+             }
+             if ($request->has('hospital_name')) {
                 $hospital->hospital_name = $request->hospital_name;
             }
-            $user->save();
-            $hospital->save();
-
-            return response()->json([
-                'message' => 'تم تحديث بيانات المستشفى بنجاح',
-                'updated_hospital' => $hospital,
-                'updated_user' => $user
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'حدث خطأ أثناء تحديث بيانات المستشفى',
-                'details' => $e->getMessage()
-            ], 500);
-        }
-    }
-
+            
+             $user->save();
+             $hospital->save();
+ 
+             return response()->json([
+                 'message' => 'تم تحديث بيانات المستشفى بنجاح',
+                 'updated_hospital' => $hospital,
+                 'updated_user' => $user
+             ], 200);
+         } catch (\Exception $e) {
+             return response()->json([
+                 'error' => 'حدث خطأ أثناء تحديث بيانات المستشفى',
+                 'details' => $e->getMessage()
+             ], 500);
+         }
+     }
     // ✅ حذف مستشفى
     public function destroy($id)
     {

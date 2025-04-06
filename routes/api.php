@@ -40,6 +40,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
         Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
+        Route::get('/hospitals', [DoctorController::class, 'getHospitals']);
+
 
        
 
@@ -52,7 +54,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/register', [HospitalController::class, 'register']);
         Route::get('/', [HospitalController::class, 'index']);
         Route::get('/{id}', [HospitalController::class, 'show']);
-        Route::post('/{id}', [HospitalController::class, 'update']);
+        Route::put('/{id}', [HospitalController::class, 'update']);
         Route::delete('/{id}', [HospitalController::class, 'destroy']);
     });
 

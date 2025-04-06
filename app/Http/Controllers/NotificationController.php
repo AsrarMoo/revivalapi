@@ -158,25 +158,32 @@ class NotificationController extends Controller
         ]);
     }
 
-//جلب الاشعارات للواجهة
-public function getUserNotificationsview()
-{
-    $userId = auth()->id(); // 🔹 جلب معرف المستخدم المسجل دخوله
+    public function getUserNotificationsview()
+    {
+        $userId = auth()->id(); // 🔹 جلب معرف المستخدم المسجل دخوله
+    
+        // جلب الإشعارات للمستخدم بناءً على شرطين:
+        // 1. المستخدم المحدد (user_id).
+        // 2. الإشعار مقرؤ (is_read = 1).
+        $notifications = Notification::where('user_id', $userId)
+            ->where('is_read', 1) // التحقق من أن الإشعار مقرؤ
+            ->latest() // ترتيب النتائج من الأحدث إلى الأقدم
+            ->get()
+            ->map(function ($notification) {
+                return [
+                    'creator' => $this->getCreatorName($notification->user_id),
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'sent_at' => Carbon::parse($notification->created_at)->format('Y-m-d H:i:s'),
+                ];
+            });
+    
+        return response()->json($notifications);
+    }
+    
 
-    $notifications = Notification::where('user_id', $userId)
-        ->latest()
-        ->get()
-        ->map(function ($notification) {
-            return [
-                'creator' => $this->getCreatorName($notification->user_id),
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'sent_at' => Carbon::parse($notification->created_at)->format('Y-m-d H:i:s'),
-            ];
-        });
 
-    return response()->json($notifications);
-}
+    
 
     
     /**
