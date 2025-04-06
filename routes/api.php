@@ -7,7 +7,7 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
-      MedicalRecordController,MedicationController,TestController};
+      MedicalRecordController,MedicationController,TestController,EmergencyController};
 
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -200,4 +200,6 @@ Route::put('/{id}', [TestController::class, 'update']);
 Route::delete('/{id}', [TestController::class, 'destroy']);
 });
 
+
+Route::post('emergency', [EmergencyController::class, 'sendEmergencyRequest']);
 });
