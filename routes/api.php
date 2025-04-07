@@ -16,7 +16,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
    
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
-    Route::post('/registerdoctor', [DoctorController::class, 'registerDoctor']);
+    Route::post('/register/doctor', [DoctorController::class, 'registerDoctor']);
 });
 
 // ✅ المسارات المحمية (تتطلب توكن)
@@ -202,5 +202,17 @@ Route::delete('/{id}', [TestController::class, 'destroy']);
 
 
 
-Route::post('find-nearest-hospitals', [EmergencyController::class, 'findNearestHospitals']);
+
+Route::prefix('ambulance-request')->group(function() {
+    //ارسال طلب اسعاف
+    Route::post('find-nearest-hospitals', [EmergencyController::class, 'findNearestHospitals']);
+    // قبول طلب الإسعاف
+    Route::post('{notificationId}/accept', [EmergencyController::class, 'acceptAmbulanceRequest']);
+    
+    // رفض طلب الإسعاف
+    Route::post('{notificationId}/reject', [EmergencyController::class, 'rejectAmbulanceRequest']);
+    
+    // عرض السجل الطبي للمريض بعد قبول الإسعاف
+    Route::get('medical-record/{ambulanceRescueId}', [EmergencyController::class, 'showPatientMedicalRecord']);
+});
 });

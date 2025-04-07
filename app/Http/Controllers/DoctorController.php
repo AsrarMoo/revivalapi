@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Doctor;
 use App\Models\User;
 use App\Models\Notification;
+use App\Models\Specialty;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
 use App\Models\PendingDoctor;
@@ -31,8 +32,9 @@ class DoctorController extends Controller
             'email'        => 'required|email|unique:pending_doctors,email',
             'password'     => 'required|min:6',
             'phone'        => 'required|string|max:15|unique:pending_doctors,phone',
-            'gender'       => 'required|in:Male,Female',
-            'specialty_id' => 'required|integer|exists:specialties,specialty_id',
+            'gender'       => 'required|in:ذكر,أنثى',
+            'specialty_name'=> 'required|string',  // اسم التخصص
+           // 'specialty_id' => 'required|integer|exists:specialties,specialty_id',
             'qualification'=> 'required|string|max:255',
             'experience'   => 'required|integer|min:0',
             'bio'          => 'nullable|string',
@@ -49,7 +51,15 @@ class DoctorController extends Controller
                                    $request->file('certificate')->store('doctor_certificates', 'public') : null;
                 $imagePath = $request->hasFile('image') ? 
                              $request->file('image')->store('doctor_images', 'public') : null;
-    
+                             $specialty = Specialty::where('specialty_name', $validatedData['specialty_name'])->first();
+
+                             if (!$specialty) {
+                                
+                                 return response()->json([
+                                     'message' => 'التخصص غير موجود!',
+                                 ], 400);
+                             }
+                             $specialtyId = $specialty->specialty_id;
                 // ✅ إنشاء سجل في `pending_doctors`
                 $pendingDoctor = PendingDoctor::create([
                     'name'     => $validatedData['name'],
@@ -57,7 +67,7 @@ class DoctorController extends Controller
                     'password'  => Hash::make($validatedData['password']),
                     'phone'           => $validatedData['phone'],
                     'gender'          => $validatedData['gender'],
-                    'specialty_id'    => $validatedData['specialty_id'],
+                    'specialty_id'   => $specialty->specialty_id,
                     'qualification'   => $validatedData['qualification'],
                     'experience'      => $validatedData['experience'],
                     'bio'             => $validatedData['bio'] ?? null,
@@ -73,7 +83,7 @@ class DoctorController extends Controller
                     'created_by' => auth()->id(),
                     'type'       => 'Requesting',
                     'title'      => 'طلب تسجيل طبيب جديد',
-                    'message'    => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']}.",
+                    'message'    => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']} (التخصص: {$specialty->specialty_name}).",  // إضافة اسم التخصص في الإشعار
                     'is_read'    => 0,
                     'created_at' => now(),
                 ]);

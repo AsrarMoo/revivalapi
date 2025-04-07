@@ -22,8 +22,18 @@ class Hospital extends Model
         
     ];
 
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'user_id', 'user_id');
-    }
+   
+    // App\Models\Hospital.php
+
+// App\Models\Hospital.php
+
+public function user()
+{
+    return $this->belongsTo(User::class);
+}
+public function ambulanceRescues()
+{
+    return $this->hasMany(AmbulanceRescue::class);
+}
+
 }
