@@ -139,117 +139,79 @@ class EmergencyController extends Controller
 {
     // الحصول على الإشعار بناءً على ID
     $notification = Notification::findOrFail($notificationId);
-    
+
     // تأكيد أن نوع الإشعار هو "ambulance"
     if ($notification->type !== 'ambulance') {
         return response()->json(['message' => 'الإشعار غير صحيح.'], 400);
     }
 
-    Log::info("بحث الإشعار باستخدام ID: " . $notificationId);
-    Log::info("معرف المستشفى من الإشعار: " . $notification->user_id);
-    Log::info("معرف المريض من الإشعار: " . $notification->created_by);
-    
-    // التحقق من المستشفى الذي وافق على الإسعاف (استخدام معرف المستشفى من الإشعار)
+    Log::info("الإشعار ID: $notificationId");
+    Log::info("المريض ID من الإشعار: {$notification->created_by}");
+    Log::info("المستشفى ID من الإشعار: {$notification->user_id}");
+    Log::info("اسم الموقع من الإشعار: {$notification->location_name}");
+
+    // التحقق من وجود المستشفى
     $hospital = Hospital::find($notification->user_id);
-    
-    // إضافة لوج للتأكد من أن المستشفى تم استرجاعه بشكل صحيح
     if (!$hospital) {
-        Log::error("لم يتم العثور على المستشفى بمعرف " . $notification->user_id);
+        Log::error("المستشفى غير موجود بمعرف: {$notification->user_id}");
         return response()->json(['message' => 'المستشفى غير موجود.'], 400);
     }
-    
-    Log::info("المستشفى الذي وافق على الإسعاف: " . $notification->user_id);
 
-    // الحصول على بيانات المريض باستخدام معرف المريض من الإشعار
+    // التحقق من وجود المريض
     $patient = Patient::find($notification->created_by);
-    Log::info("معرف المريض من الإشعار: " . $notification->created_by);
-
     if (!$patient) {
-        Log::error("معرف المريض فارغ. الإشعار ID: " . $notification->created_by);
+        Log::error("المريض غير موجود بمعرف: {$notification->created_by}");
         return response()->json(['message' => 'المريض غير موجود.'], 400);
     }
 
-
-    // تأكيد أن hospital_id موجود وأنه ليس null
+    // التأكد من أن المستشفى له حساب مستخدم
     if (is_null($hospital->user_id)) {
-        Log::error("معرف المستشفى فارغ. الإشعار ID: " . $notification->use_id);
+        Log::error("معرف مستخدم المستشفى فارغ");
         return response()->json(['message' => 'معرف المستشفى غير صحيح.'], 400);
     }
 
-    // تخزين السجل في جدول الإسعاف (استخدام معرف المستشفى من الإشعار)
-    Log::info("تخزين سجل الإسعاف للمريض ID: " . $patient->created_by . " المستشفى ID: " . $hospital->usr_id);
+    // تخزين بيانات الإسعاف
     $ambulanceRescue = new AmbulanceRescue();
-    $ambulanceRescue->patient_id = $notification->created_by;  // استخدام معرف المريض من الإشعار
-    $ambulanceRescue->hospital_id = $notification->user_id;  // استخدام معرف المستشفى من الإشعار
-    $ambulanceRescue->rescued_by_name = Auth::user()->name;  // اسم الشخص الذي قام بالإسعاف
-    $ambulanceRescue->latitude = $notification->latitude;  // يمكن استبدالها بالإحداثيات الحقيقية
-    $ambulanceRescue->longitude = $notification->longitude;
+    $ambulanceRescue->patient_id = $notification->created_by;         // من الإشعار
+    $ambulanceRescue->hospital_id = $notification->user_id;          // من الإشعار
+    $ambulanceRescue->rescued_by_name = Auth::user()->name;          // المسعف الحالي
+    $message = $notification->message;
+    $locationName = '';
+
+    if (strpos($message, 'الموقع:') !== false) {
+        $parts = explode('الموقع:', $message);
+        if (isset($parts[1])) {
+            $locationName = trim($parts[1]);
+        }
+    }
+
+    $ambulanceRescue->location_name = $locationName;
+
     $ambulanceRescue->save();
 
-    Log::info("تم تخزين سجل الإسعاف بنجاح للمريض ID: " . $patient->id);
+    // إرسال إشعار للمريض بأن الإسعاف في الطريق
+    $responseNotification = new Notification();
+    $responseNotification->user_id = $notification->created_by; // هذا هو المريض
+    $responseNotification->created_by = $notification->user_id; // هذا المستشفى اللي وافق
+    $responseNotification->title = '🚑 الإسعاف في الطريق إليك';
+    $responseNotification->message = "تم قبول طلبك للإسعاف من مستشفى {$hospital->hospital_name}. الإسعاف الآن في الطريق إليك.";
+    $responseNotification->type = 'ambulance-response';
+    $responseNotification->is_read = 0;
+    $responseNotification->save();
 
-    // تحديث حالة الإشعار للمستشفى
-    $notification->is_read = 1; // يمكن تغييرها إلى حالة مقبول
-    $notification->message = 'تم إسعاف المريض بنجاح';
-    $notification->save();
+    // تحديث كل إشعارات الإسعاف الأخرى لتصبح "ambulance-ignored"
+    Notification::where('type', 'ambulance')
+        ->where('created_by', $notification->created_by)
+        ->where('id', '!=', $notification->id)
+        ->update(['type' => 'ambulance-ignored']);
 
-    Log::info("تم تحديث حالة الإشعار بنجاح للمستشفى ID: " . $hospital->id);
+    Log::info("تم حفظ طلب الإسعاف بنجاح. المريض: {$notification->created_by}، المستشفى: {$notification->user_id}");
 
-    return response()->json(['message' => 'تم قبول طلب الإسعاف بنجاح.']);
+    return response()->json(['message' => 'تم قبول طلب الإسعاف بنجاح'], 200);
+}
 
-
-        // إرسال إشعار للمستشفيات الأخرى
-        $this->sendNotificationToOtherHospitals($hospital, $notification);
-    
-        return response()->json([
-            'message' => 'تم قبول طلب الإسعاف بنجاح.',
-            'ambulance_rescue' => $ambulanceRescue,
-        ]);
-    }
-    
-    public function rejectAmbulanceRequest($notificationId)
-    {
-        // الحصول على الإشعار بناءً على ID
-        $notification = Notification::findOrFail($notificationId);
-        
-        // تأكيد أن نوع الإشعار هو "ambulance"
-        if ($notification->type !== 'ambulance') {
-            return response()->json(['message' => 'الإشعار غير صحيح.'], 400);
-        }
-    
-        // تحديث حالة الإشعار للمستشفى
-        $notification->is_read = 1;
-        $notification->message = 'تم رفض الإسعاف من قبلكم';
-        $notification->save();
-    
-        // إرسال إشعار للمستشفى الآخر بأنه تم رفض الإسعاف
-        $this->sendNotificationToOtherHospitals(Hospital::find($notification->user_id), $notification);
-    
-        return response()->json([
-            'message' => 'تم رفض طلب الإسعاف بنجاح.',
-        ]);
-    }
-    
-    public function sendNotificationToOtherHospitals($hospital, $notification)
-    {
-        // إرسال إشعار للمستشفيات الأخرى
-        $otherHospitals = Hospital::where('hospital_id', '!=', $hospital->hospital_id)->get();
-        foreach ($otherHospitals as $otherHospital) {
-            // جلب المستخدم المرتبط بالمستشفى
-            $hospitalUserId = $otherHospital->user_id;
-    
-            // استخدام إشعار جديد
-            $newNotification = new Notification();
-            $newNotification->user_id = $hospitalUserId;
-            $newNotification->created_by = $notification->created_by;
-            $newNotification->title = 'طلب إسعاف تم استكماله';
-            $newNotification->message = "تم إسعاف المريض من مستشفى {$hospital->hospital_name}.";
-            $newNotification->type = 'ambulance';
-            $newNotification->is_read = 0;
-            $newNotification->save();
-        }
-    }
-    
+  
+     
     public function showPatientMedicalRecord($ambulanceRescueId)
     {
         // الحصول على سجل الإسعاف

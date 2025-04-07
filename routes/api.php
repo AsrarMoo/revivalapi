@@ -17,6 +17,7 @@ Route::prefix('auth')->group(function () {
    
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
     Route::post('/register/doctor', [DoctorController::class, 'registerDoctor']);
+    Route::get('specialties/list', [SpecialtyController::class, 'getSpecialties']);
 });
 
 // ✅ المسارات المحمية (تتطلب توكن)
@@ -127,7 +128,7 @@ Route::middleware('auth:api')->group(function () {
     // ✅ إدارة التخصصات
     Route::prefix('specialties')->group(function () {
         Route::post('/create', [SpecialtyController::class, 'store']);
-        Route::get('/list', [SpecialtyController::class, 'getSpecialties']);
+      
         Route::get('/', [SpecialtyController::class, 'index']);
         Route::get('/{id}', [SpecialtyController::class, 'show']);
         Route::put('/{id}', [SpecialtyController::class, 'update']);
