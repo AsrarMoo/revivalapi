@@ -38,7 +38,7 @@ class DoctorController extends Controller
             'qualification'=> 'required|string|max:255',
             'experience'   => 'required|integer|min:0',
             'bio'          => 'nullable|string',
-            'license'      => 'required|file|max:2048',
+          //  'license'      => 'nullable|max:2048',
             'certificate'  => 'nullable|file|max:2048',
             'image'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
