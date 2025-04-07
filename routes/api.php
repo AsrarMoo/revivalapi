@@ -7,7 +7,7 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
-      MedicalRecordController,MedicationController,TestController,EmergencyController};
+      MedicalRecordController,MedicationController,TestController,EmergencyController,AmbulanceRescueController};
 
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -213,7 +213,8 @@ Route::prefix('ambulance-request')->group(function() {
     // رفض طلب الإسعاف
     Route::post('{notificationId}/reject', [EmergencyController::class, 'rejectAmbulanceRequest']);
     
-    // عرض السجل الطبي للمريض بعد قبول الإسعاف
-    Route::get('medical-record/{ambulanceRescueId}', [EmergencyController::class, 'showPatientMedicalRecord']);
+   // ملف routes/api.php
+Route::get('/hospital/rescued-patients', [AmbulanceRescueController::class, 'getPatientDataForHospital']);
+
 });
 });
