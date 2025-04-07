@@ -19,77 +19,125 @@ class AppointmentController extends Controller
         return response()->json(Appointment::with(['patient', 'hospital', 'doctor', 'schedule'])->get());
     }
 
+    
+
+
     public function store(Request $request)
     {
-        Log::info('🔹 بدء تنفيذ دالة store لحجز موعد جديد');
-    
-        $user = Auth::user();
-        Log::info('🧑‍💼 المستخدم الحالي:', ['user' => $user]);
-    
-        $userType = DB::table('users')->where('user_id', $user->user_id)->value('user_type');
-        Log::info('🛠 نوع المستخدم:', ['user_type' => $userType]);
-    
-        if ($userType !== 'patient') {
-            Log::warning('🚫 محاولة حجز من مستخدم غير مريض!', ['user_id' => $user->user_id]);
-            return response()->json(['message' => 'مسموح فقط للمرضى بحجز المواعيد'], 403);
-        }
-    
-        $patient = DB::table('patients')->where('user_id', $user->user_id)->first();
-        
-        if (!$patient) {
-            Log::error('❌ لم يتم العثور على بيانات المريض!', ['user_id' => $user->user_id]);
-            return response()->json(['message' => 'لم يتم العثور على بيانات المريض'], 404);
-        }
-    
-        Log::info('✅ تم العثور على بيانات المريض:', ['patient' => $patient]);
-    
-        $validatedData = $request->validate([
-            'hospital_id' => 'required|exists:hospitals,hospital_id',
+        $request->validate([
             'doctor_id' => 'required|exists:doctors,doctor_id',
+            'hospital_id' => 'required|exists:hospitals,hospital_id',
             'schedule_id' => 'required|exists:doctor_schedules,schedule_id',
+            'day_of_week' => 'required|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', 
+            'start_time' => 'required|date_format:H:i',  
+            'end_time' => 'required|date_format:H:i|after:start_time', 
         ]);
     
-        Log::info('✅ البيانات المدخلة صحيحة:', ['request_data' => $validatedData]);
+        // تحقق من أن الطبيب متاح في اليوم والوقت المحدد
+        $schedule = DoctorSchedule::where('doctor_id', $request->doctor_id)
+            ->where('hospital_id', $request->hospital_id)
+            ->where('day_of_week', $request->day_of_week)
+            ->where('start_time', '>=', $request->start_time)
+            ->where('end_time', '<=', $request->end_time)
+            ->first();
     
+        if (!$schedule) {
+            return response()->json(['message' => 'الموعد غير متاح في الوقت المحدد.'], 400);
+        }
+    
+        // إضافة الحجز
         $appointment = Appointment::create([
-            'patient_id' => $patient->patient_id,
+            'patient_id' => auth()->user()->patient->patient_id,
             'hospital_id' => $request->hospital_id,
             'doctor_id' => $request->doctor_id,
             'schedule_id' => $request->schedule_id,
             'status' => 'Pending',
         ]);
     
-        Log::info('📅 تم إنشاء الحجز بنجاح:', ['appointment' => $appointment]);
+        // إرسال إشعار للمستشفى
+        $hospitalUser = User::where('hospital_id', $request->hospital_id)->first();
     
-        $doctor = DB::table('doctors')->where('doctor_id', $request->doctor_id)->first();
-        $schedule = DB::table('doctor_schedules')->where('schedule_id', $request->schedule_id)->first();
-    
-        $hospitalUserId = DB::table('users')
-            ->where('hospital_id', $request->hospital_id)
-            ->value('user_id');
-    
-        if ($hospitalUserId && $doctor && $schedule) {
-            $startDate = Carbon::parse($schedule->start_time)->translatedFormat('l d F Y الساعة h:i A');
-            $endDate = Carbon::parse($schedule->end_time)->translatedFormat('h:i A');
-    
-            Log::info('📢 إرسال إشعار للمستشفى:', [
-                'hospital_user_id' => $hospitalUserId,
-                'patient_name' => $patient->patient_name,
-                'doctor_name' => $doctor->doctor_name,
-                'appointment_time' => "$startDate - $endDate"
+        if ($hospitalUser) {
+            Notification::create([
+                'user_id' => $hospitalUser->user_id,
+                'created_by' => auth()->id(),
+                'title' => 'طلب حجز جديد',
+                'message' => 'المريض ' . auth()->user()->patient->patient_name . ' يرغب بحجز موعد.',
+                'type' => 'booking',
+                'is_read' => 0,
             ]);
-    
-            $this->sendNotification($hospitalUserId, 'طلب حجز جديد', 'المريض ' . $patient->patient_name . ' حجز موعد مع الدكتور ' . $doctor->doctor_name .
-                ' من ' . $startDate . ' إلى ' . $endDate . '، يرجى المراجعة والموافقة.');
         }
     
-        Log::info('✅ تم تنفيذ الدالة بنجاح، بانتظار موافقة المستشفى.');
-    
-        return response()->json([
-            'message' => 'تم إنشاء الحجز بنجاح، في انتظار موافقة المستشفى',
-            'appointment' => $appointment
-        ], 201);
+        return response()->json(['message' => 'تم إرسال طلب الحجز بنجاح.'], 201);
     }
+    
+
+public function respondToAppointment(Request $request, $id)
+{
+    $request->validate([
+        'action' => 'required|in:accept,reject',
+    ]);
+
+    $appointment = Appointment::with(['patient', 'doctor'])->findOrFail($id);
+
+    if ($request->action === 'accept') {
+        $appointment->status = 'Confirmed';
+        $appointment->save();
+
+        // إشعار للمريض
+        Notification::create([
+            'user_id' => $appointment->patient->user_id,
+            'created_by' => auth()->id(),
+            'title' => 'تم تأكيد الحجز',
+            'message' => 'تم تأكيد حجزك في المستشفى بنجاح.',
+            'type' => 'booking',
+            'is_read' => 0,
+        ]);
+
+        // إشعار للطبيب
+        $doctorUser = User::where('doctor_id', $appointment->doctor_id)->first();
+        if ($doctorUser) {
+            Notification::create([
+                'user_id' => $doctorUser->user_id,
+                'created_by' => auth()->id(),
+                'title' => 'لديك حجز جديد',
+                'message' => 'يوجد حجز جديد من المريض ' . $appointment->patient->patient_name,
+                'type' => 'booking',
+                'is_read' => 0,
+            ]);
+        }
+
+    } else {
+        $appointment->status = 'Rejected';
+        $appointment->save();
+
+        // إشعار للمريض بالرفض
+        Notification::create([
+            'user_id' => $appointment->patient->user_id,
+            'created_by' => auth()->id(),
+            'title' => 'تم رفض الحجز',
+            'message' => 'نأسف، تم رفض طلب الحجز الخاص بك.',
+            'type' => 'Rejected',
+            'is_read' => 0,
+        ]);
+    }
+
+    return response()->json(['message' => 'تم تنفيذ الإجراء بنجاح.']);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public function reviewAppointment(Request $request, $id)
     {

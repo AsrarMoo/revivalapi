@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
@@ -34,8 +35,8 @@ class UserController extends Controller
                     'patient' => $user->patient?->patient_name,
                     default => null,
                 },
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
+                'created_at' => Carbon::parse($user->created_at)->format('Y-m-d h:i A'), // ⬅️ صيغة مفهومة
+                'updated_at' => Carbon::parse($user->updated_at)->format('Y-m-d h:i A'),
             ];
         });
     
@@ -131,8 +132,8 @@ class UserController extends Controller
                 'patient' => $user->patient?->patient_name,
                 default => null,
             },
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
+            'created_at' => Carbon::parse($user->created_at)->format('Y-m-d h:i A'), // ⬅️ صيغة مفهومة
+            'updated_at' => Carbon::parse($user->updated_at)->format('Y-m-d h:i A'),
         ];
     
         return response()->json($userData);

@@ -71,19 +71,23 @@ class NotificationController extends Controller
     public function getUserNotifications()
     {
         $userId = Auth::id();
-    
-        $notifications = Notification::where('user_id', $userId)
-            ->orWhereNull('user_id')
-            ->orderBy('created_at', 'desc')
-            ->get();
-    
+        
+        // استعلام للحصول على الإشعارات للمستخدم مع شرط عدم قراءة الإشعار
+        $notifications = Notification::where(function ($query) use ($userId) {
+            $query->where('user_id', $userId)
+                  ->orWhereNull('user_id');
+        })
+        ->where('is_read', '!=', 1)  // إضافة شرط لتجاهل الإشعارات المقروءة
+        ->orderBy('created_at', 'desc')
+        ->get();
+        
         $notifications->transform(function ($notification) {
             $creatorName = $this->getCreatorName($notification->created_by);
-    
+        
             return [
                 'notification_id' => $notification->notification_id,
                 'user_id' => $notification->user_id,
-                'created_by' => $creatorName, // 👈 استبدال المعرف بالاسم الصحيح
+                'created_by' => $creatorName, // استبدال المعرف بالاسم الصحيح
                 'title' => $notification->title,
                 'message' => $notification->message,
                 'type' => $notification->type,
@@ -91,7 +95,7 @@ class NotificationController extends Controller
                 'created_at' => $notification->created_at,
             ];
         });
-    
+        
         return response()->json([
             'user_id' => $userId,
             'count' => $notifications->count(),

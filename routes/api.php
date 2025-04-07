@@ -201,5 +201,6 @@ Route::delete('/{id}', [TestController::class, 'destroy']);
 });
 
 
-Route::post('emergency', [EmergencyController::class, 'sendEmergencyRequest']);
+
+Route::post('find-nearest-hospitals', [EmergencyController::class, 'findNearestHospitals']);
 });

@@ -1,83 +1,93 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Hospital;
-use App\Models\Notification;
 use Illuminate\Http\Request;
+use App\Models\Notification;
+use Illuminate\Support\Facades\Log;
 
+use Illuminate\Support\Facades\DB;
 class EmergencyController extends Controller
 {
-    public function sendEmergencyRequest(Request $request)
+    
+   
+
+    
+    public function findNearestHospitals(Request $request)
     {
-        // الحصول على الإحداثيات من الطلب
+        // Logging لتسجيل مدخلات الطلب
+        Log::debug('Received Request:', $request->all());
+    
         $latitude = $request->input('latitude');
         $longitude = $request->input('longitude');
-
-        // التحقق إذا كانت الإحداثيات صحيحة
-        if (!$latitude || !$longitude) {
-            return response()->json(['message' => 'الإحداثيات غير صالحة'], 400);
-        }
-
-        // منطق إيجاد أقرب مستشفى بناءً على الإحداثيات
-        $hospital = $this->findNearestHospital($latitude, $longitude);
-
-        if ($hospital) {
-            // إنشاء إشعار للمستشفى
-            $notification = new Notification();
-            $notification->user_id = $hospital->id;  // ID المستشفى
-            $notification->message = "طلب إسعاف جديد بالقرب منك!";
-            $notification->type = "طلب إسعاف";
-            $notification->save();
-
-            // إرسال استجابة ناجحة
-            return response()->json(['message' => 'تم إرسال الطلب بنجاح'], 200);
-        } else {
-            // إذا لم يتم العثور على مستشفى
-            return response()->json(['message' => 'لم يتم العثور على مستشفى قريب'], 404);
-        }
-    }
-
-    // دالة إيجاد أقرب مستشفى بناءً على الإحداثيات
-    private function findNearestHospital($latitude, $longitude)
-    {
-        // استخدام الخوارزمية المناسبة لإيجاد أقرب مستشفى (يمكنك استخدام Haversine Formula أو أي خوارزمية أخرى)
-        // هنا نستخدم خوارزمية بسيطة لتحديد المستشفى الأقرب بناءً على الإحداثيات.
+        $userId = $request->input('user_id'); // الحصول على user_id من الطلب
+    
+        Log::debug("Received Latitude: $latitude, Longitude: $longitude, User ID: $userId");
+    
+        // استعلام للعثور على أقرب 3 مستشفيات باستخدام Haversine Formula
+        try {
+            $hospitals = DB::table('hospitals')
+            ->select('hospitals.hospital_id', 'hospitals.hospital_name', 'hospitals.latitude', 'hospitals.longitude', DB::raw('
+                (6371 * acos(cos(radians(?)) * cos(radians(hospitals.latitude)) * cos(radians(hospitals.longitude) - radians(?)) + sin(radians(?)) * sin(radians(hospitals.latitude)))) AS distance
+            )', [$latitude, $longitude, $latitude])) // تمرير المعاملات بشكل صحيح
+            ->orderBy('distance')  // ترتيب المستشفيات حسب المسافة
+            ->limit(3)  // أخذ أقرب 3 مستشفيات
+            ->get();
         
-        $hospitals = Hospital::all(); // استرجاع جميع المستشفيات (يمكنك تحسين الاستعلام)
-
-        $nearestHospital = null;
-        $minDistance = PHP_INT_MAX;
-
+        
+        
+    
+            // Logging للـ Hospitals المسترجعة
+            Log::debug('Found Hospitals: ', $hospitals->toArray());
+        } catch (\Exception $e) {
+            // Logging للأخطاء في حال فشل الاستعلام
+            Log::error('Error while retrieving hospitals: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to retrieve hospitals'], 500);
+        }
+    
+        // إرسال إشعارات للمستشفيات القريبة
+        $notificationsSent = 0; // عداد لتتبع عدد الإشعارات المرسلة
         foreach ($hospitals as $hospital) {
-            $distance = $this->calculateDistance($latitude, $longitude, $hospital->latitude, $hospital->longitude);
-            if ($distance < $minDistance) {
-                $minDistance = $distance;
-                $nearestHospital = $hospital;
+            try {
+                // Logging عندما يبدأ إرسال الإشعار
+                Log::debug("Sending notification to hospital ID: {$hospital->id}, Name: {$hospital->name}");
+    
+                // إنشاء إشعار جديد لكل مستشفى
+                $notification = new Notification();
+                $notification->user_id = $userId; // معرف المستخدم
+                $notification->created_by = $userId; // يمكن أن يكون الشخص الذي أرسل الطلب
+                $notification->title = 'طلب إسعاف قريب';
+                $notification->message = "يوجد طلب إسعاف بالقرب من مستشفاكم في الإحداثيات: ($latitude, $longitude)";
+                $notification->type = 'ambulance'; // نوع الإشعار
+                $notification->is_read = 0; // إشعار غير مقروء
+    
+                // حفظ الإشعار
+                $notification->save();
+                $notificationsSent++;
+    
+                // Logging بعد نجاح إرسال الإشعار
+                Log::debug("Notification sent to hospital ID: {$hospital->id}");
+            } catch (\Exception $e) {
+                // Logging في حال حدوث خطأ أثناء حفظ الإشعار
+                Log::error("Error sending notification to hospital ID: {$hospital->id}, Error: " . $e->getMessage());
             }
         }
-
-        return $nearestHospital;
+    
+        // Logging لعدد الإشعارات المرسلة
+        Log::debug('Notifications sent: ' . $notificationsSent);
+    
+        // إرسال استجابة للمستخدم
+        if ($notificationsSent > 0) {
+            return response()->json([
+                'message' => "$notificationsSent إشعار تم إرساله بنجاح.",
+                'hospitals' => $hospitals,
+            ]);
+        } else {
+            return response()->json([
+                'message' => 'لم يتم إرسال أي إشعارات.',
+                'hospitals' => $hospitals,
+            ]);
+        }
     }
-
-    // دالة لحساب المسافة بين إحداثيين باستخدام Haversine Formula
-    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
-    {
-        $earthRadius = 6371; // نصف قطر الأرض بالكيلومترات
-
-        $latFrom = deg2rad($lat1);
-        $lonFrom = deg2rad($lon1);
-        $latTo = deg2rad($lat2);
-        $lonTo = deg2rad($lon2);
-
-        $latDiff = $latTo - $latFrom;
-        $lonDiff = $lonTo - $lonFrom;
-
-        $a = sin($latDiff / 2) * sin($latDiff / 2) +
-            cos($latFrom) * cos($latTo) *
-            sin($lonDiff / 2) * sin($lonDiff / 2);
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c; // المسافة بالكيلومترات
-    }
+    
 }
