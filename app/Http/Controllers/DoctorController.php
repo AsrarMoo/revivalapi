@@ -71,7 +71,7 @@ class DoctorController extends Controller
                     'qualification'   => $validatedData['qualification'],
                     'experience'      => $validatedData['experience'],
                     'bio'             => $validatedData['bio'] ?? null,
-                    'license_path'    => $licensePath,
+                    //'license_path'    => $licensePath,
                     'certificate_path'=> $certificatePath,
                     'image_path'      => $imagePath,
                     'status'          => 'pending',

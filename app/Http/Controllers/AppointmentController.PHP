@@ -23,43 +23,53 @@ class AppointmentController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $validatedData = $request->validate([
-            'doctor_name' => 'required|string',
-            'hospital_name' => 'required|string',
-            'day_of_week' => 'required|string',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i',
-        ]);
-    
-        // البحث عن الطبيب
-        $doctor = Doctor::where('doctor_name', $validatedData['doctor_name'])->first();
-        if (!$doctor) {
-            return response()->json(['error' => 'اسم الطبيب غير موجود.'], 404);
-        }
-    
-        // البحث عن المستشفى
-        $hospital = Hospital::where('hospital_name', $validatedData['hospital_name'])->first();
-        if (!$hospital) {
-            return response()->json(['error' => 'اسم المستشفى غير موجود.'], 404);
-        }
-    
-        // حفظ الموعد
-        $appointment = new Appointment();
-        $appointment->doctor_id = $doctor->doctor_id;
-        $appointment->hospital_id = $hospital->hospital_id;
-        $appointment->day_of_week = $validatedData['day_of_week'];
-        $appointment->start_time = $validatedData['start_time'];
-        $appointment->end_time = $validatedData['end_time'];
-        $appointment->save();
-    
-        return response()->json([
-            'message' => 'تم إضافة الموعد بنجاح.',
-            'data' => $appointment
-        ], 201);
-    }
-    
+{
+    $validatedData = $request->validate([
+        'doctor_name' => 'required|string',
+        'hospital_name' => 'required|string',
+        'day_of_week' => 'required|string',
+        'start_time' => 'required|date_format:H:i',
+        'end_time' => 'required|date_format:H:i',
+    ]);
 
+    // البحث عن الطبيب
+    $doctor = Doctor::whereRaw('LOWER(doctor_name) = ?', [strtolower($validatedData['doctor_name'])])->first();
+    if (!$doctor) {
+        return response()->json(['error' => 'اسم الطبيب غير موجود.'], 404);
+    }
+
+    // البحث عن المستشفى
+    $hospital = Hospital::whereRaw('LOWER(hospital_name) = ?', [strtolower($validatedData['hospital_name'])])->first();
+    if (!$hospital) {
+        return response()->json(['error' => 'اسم المستشفى غير موجود.'], 404);
+    }
+
+    // البحث عن موعد الطبيب بناءً على اليوم والوقت
+    $schedule = Schedule::where('doctor_id', $doctor->doctor_id)
+                        ->where('hospital_id', $hospital->hospital_id)
+                        ->where('day_of_week', $validatedData['day_of_week'])
+                        ->where('start_time', $validatedData['start_time'])
+                        ->where('end_time', $validatedData['end_time'])
+                        ->first();
+
+    if (!$schedule) {
+        return response()->json(['error' => 'لا يوجد موعد مطابق لهذا اليوم والوقت.'], 404);
+    }
+
+    // حفظ الموعد للمريض
+    $appointment = new Appointment();
+    $appointment->doctor_id = $doctor->doctor_id;
+    $appointment->hospital_id = $hospital->hospital_id;
+    $appointment->patient_id = $request->patient_id; // التأكد من أن patient_id موجود في الـ request
+    $appointment->schedule_id = $schedule->schedule_id; // ربط الموعد بـ schedule_id
+    $appointment->status = 'Pending'; // أو حسب الحاجة
+    $appointment->save();
+
+    return response()->json([
+        'message' => 'تم إضافة الموعد بنجاح.',
+        'data' => $appointment
+    ], 201);
+}
 
 
 
