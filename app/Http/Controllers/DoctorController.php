@@ -46,7 +46,7 @@ class DoctorController extends Controller
         return DB::transaction(function () use ($validatedData, $request) {
             try {
                 // ✅ تخزين الملفات
-                $licensePath = $request->file('license')->store('doctor_licenses', 'public');
+         //       $licensePath = $request->file('license')->store('doctor_licenses', 'public');
                 $certificatePath = $request->hasFile('certificate') ? 
                                    $request->file('certificate')->store('doctor_certificates', 'public') : null;
                 $imagePath = $request->hasFile('image') ? 

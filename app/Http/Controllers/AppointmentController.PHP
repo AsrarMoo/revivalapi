@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Models\Notification;
-
+use App\Models\Doctor;
+use App\Models\Hospital;
+use App\Models\Schedule;
+use App\Models\Patient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,58 +22,82 @@ class AppointmentController extends Controller
         return response()->json(Appointment::with(['patient', 'hospital', 'doctor', 'schedule'])->get());
     }
 
-    
-
-
     public function store(Request $request)
     {
-        $request->validate([
-            'doctor_id' => 'required|exists:doctors,doctor_id',
-            'hospital_id' => 'required|exists:hospitals,hospital_id',
-            'schedule_id' => 'required|exists:doctor_schedules,schedule_id',
-            'day_of_week' => 'required|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', 
-            'start_time' => 'required|date_format:H:i',  
-            'end_time' => 'required|date_format:H:i|after:start_time', 
+        $validatedData = $request->validate([
+            'doctor_name' => 'required|string',
+            'hospital_name' => 'required|string',
+            'day_of_week' => 'required|string',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i',
         ]);
     
-        // تحقق من أن الطبيب متاح في اليوم والوقت المحدد
-        $schedule = DoctorSchedule::where('doctor_id', $request->doctor_id)
-            ->where('hospital_id', $request->hospital_id)
-            ->where('day_of_week', $request->day_of_week)
-            ->where('start_time', '>=', $request->start_time)
-            ->where('end_time', '<=', $request->end_time)
-            ->first();
-    
-        if (!$schedule) {
-            return response()->json(['message' => 'الموعد غير متاح في الوقت المحدد.'], 400);
+        // البحث عن الطبيب
+        $doctor = Doctor::where('doctor_name', $validatedData['doctor_name'])->first();
+        if (!$doctor) {
+            return response()->json(['error' => 'اسم الطبيب غير موجود.'], 404);
         }
     
-        // إضافة الحجز
-        $appointment = Appointment::create([
-            'patient_id' => auth()->user()->patient->patient_id,
-            'hospital_id' => $request->hospital_id,
-            'doctor_id' => $request->doctor_id,
-            'schedule_id' => $request->schedule_id,
-            'status' => 'Pending',
-        ]);
-    
-        // إرسال إشعار للمستشفى
-        $hospitalUser = User::where('hospital_id', $request->hospital_id)->first();
-    
-        if ($hospitalUser) {
-            Notification::create([
-                'user_id' => $hospitalUser->user_id,
-                'created_by' => auth()->id(),
-                'title' => 'طلب حجز جديد',
-                'message' => 'المريض ' . auth()->user()->patient->patient_name . ' يرغب بحجز موعد.',
-                'type' => 'booking',
-                'is_read' => 0,
-            ]);
+        // البحث عن المستشفى
+        $hospital = Hospital::where('hospital_name', $validatedData['hospital_name'])->first();
+        if (!$hospital) {
+            return response()->json(['error' => 'اسم المستشفى غير موجود.'], 404);
         }
     
-        return response()->json(['message' => 'تم إرسال طلب الحجز بنجاح.'], 201);
+        // حفظ الموعد
+        $appointment = new Appointment();
+        $appointment->doctor_id = $doctor->doctor_id;
+        $appointment->hospital_id = $hospital->hospital_id;
+        $appointment->day_of_week = $validatedData['day_of_week'];
+        $appointment->start_time = $validatedData['start_time'];
+        $appointment->end_time = $validatedData['end_time'];
+        $appointment->save();
+    
+        return response()->json([
+            'message' => 'تم إضافة الموعد بنجاح.',
+            'data' => $appointment
+        ], 201);
     }
     
+
+
+
+
+    public function approveAppointment($appointmentId)
+    {
+        $appointment = Appointment::find($appointmentId);
+    
+        // التحقق من أن المستشفى قد وافق على الحجز
+        if ($appointment && $appointment->hospital_approval == 'approved') {
+            $appointment->status = 'confirmed';
+            $appointment->save();
+    
+            return response()->json(['success' => 'تم تأكيد الحجز.'], 200);
+        }
+    
+        return response()->json(['error' => 'الحجز لم تتم الموافقة عليه من المستشفى.'], 400);
+    }
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 public function respondToAppointment(Request $request, $id)
 {
