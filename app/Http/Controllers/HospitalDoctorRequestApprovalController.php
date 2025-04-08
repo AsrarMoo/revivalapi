@@ -29,13 +29,13 @@ class HospitalDoctorRequestApprovalController extends Controller
         }
 
         // التأكد أن الطلب لم يُعالج مسبقًا
-        if ($doctorRequest->status !== 'pending') {
+        if ($doctorRequest->status !== 'معلق') {
             return response()->json(['error' => 'تمت معالجة هذا الطلب بالفعل.'], 400);
         }
 
         // التحقق من صحة الإدخال
         $request->validate([
-            'status' => 'required|in:accepted,rejected',
+            'status' => 'required|in:مقبول,مرفوض',
         ]);
 
         // تحديث حالة الطلب
@@ -44,7 +44,7 @@ class HospitalDoctorRequestApprovalController extends Controller
         $doctorRequest->save();
 
         // إرسال إشعار للطبيب والمستشفى
-        $message = ($status === 'accepted')
+        $message = ($status === 'مقبول')
             ? 'تمت الموافقة على طلب إضافة الطبيب بنجاح.'
             : 'تم رفض طلب إضافة الطبيب.';
 
@@ -77,7 +77,7 @@ class HospitalDoctorRequestApprovalController extends Controller
         }
 
         // إذا تمت الموافقة، يتم إضافة الطبيب للمستشفى
-        if ($status === 'accepted') {
+        if ($status === 'مقبول') {
             try {
                 // التحقق من أن بيانات الطبيب والمستشفى غير فارغة
                 if (empty($doctorRequest->doctor_id) || empty($doctorRequest->hospital_id)) {

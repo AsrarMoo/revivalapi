@@ -47,7 +47,7 @@ class HospitalDoctorRequestController extends Controller
         $requestData = HospitalDoctorRequest::create([
             'hospital_id' => $hospital_id,
             'doctor_id' => $request->doctor_id,
-            'status' => 'pending',
+            'status' => 'معلق',
         ]);
 
         // 🔹 إرسال إشعار تلقائي إلى وزارة الصحة (المستخدمين من نوع healthMinistry)

@@ -215,6 +215,12 @@ Route::prefix('ambulance-request')->group(function() {
     
    // ملف routes/api.php
 Route::get('/hospital/rescued-patients', [AmbulanceRescueController::class, 'getPatientDataForHospital']);
+//اسعاف شخص اخر
+Route::post('ambulance-request/send', [EmergencyController::class, 'findNearestHospitalsForAnotherPatient']);
+
+Route::post('/accept-other/{notificationId}', [EmergencyController::class, 'acceptAmbulanceRequestForOther']);
+
+Route::put('/ambulance/{rescueId}/mark-fake', [EmergencyController::class, 'markFakeAmbulanceRequest']);
 
 });
 });
