@@ -12,13 +12,13 @@ class Test extends Model
 
     protected $fillable = [
         'test_name',
-        'test_description',
+      
     ];
 
-    public $timestamps = true;
+    public $timestamps = false;
+    
 
-    public function medicalRecordTests()
-{
-    return $this->hasMany(MedicalRecordTest::class, 'test_id');
-}
+
+
+
 }

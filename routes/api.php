@@ -152,9 +152,15 @@ Route::prefix('appointments')->group(function () {
     Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
     Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
     Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
-    Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
+    Route::post('/confirm/{appointment_id}', [AppointmentController::class, 'confirmAppointment']);
+    Route::get('/hospital/record', [AppointmentController::class, 'getHospitalAppointments']);
+    Route::get('/doctor/record', [AppointmentController::class, 'getDoctorAppointments']);
+    Route::delete('{appointmentId}/cancel', [AppointmentController::class, 'cancelAppointment']);
+    Route::get('/doctor/{doctorId}/schedules', [ScheduleController::class, 'showDoctorSchedules']);
+
+    //Route::post('/review/{id}', [AppointmentController::class, 'reviewAppointment']); // مراجعة حالة الحجز (مثلاً قبول أو رفض)
    // Route::get('/hospital/{hospital_id}', [AppointmentController::class, 'getHospitalAppointments']); // جلب جميع الحجوزات الخاصة بالمستشفى
-   Route::get('/doctor/appointments', [AppointmentController::class, 'getAppointmentsForDoctor']);
+   //Route::get('/doctor/appointments', [AppointmentController::class, 'getAppointmentsForDoctor']);
 
 // مسار عرض الحجوزات الخاصة بالمستشفى
 Route::get('/hospital/appointments', [AppointmentController::class, 'getAppointmentsForHospital']);
@@ -178,9 +184,18 @@ Route::prefix('medical-records')->group(function () {
    Route::get('/doctor/patient/{patientId}/date', [MedicalRecordController::class, 'getDoctorPatientRecordsDates']);
    // روت لعرض  نفاصيل السجل الطبي للطبيب 
    Route::get('/doctor/record/{medical_record_id}', [MedicalRecordController::class, 'getDoctorRecordDetails']);
+//روت لعرض تواريخ السجلات الطبية للمريض
+   Route::get('/patient/record/dates', [MedicalRecordController::class, 'getPatientRecordsDatesforpatient']);
+//روت لعرض تفاصيل السجل الطبي للمريض
+   Route::get('/patient/record/{medical_record_id}', [MedicalRecordController::class, 'getPatientRecordDetailsforpatient']);
 
   
 });
+
+
+
+
+
 
 
 

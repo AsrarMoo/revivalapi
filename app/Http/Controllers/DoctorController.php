@@ -151,7 +151,7 @@ class DoctorController extends Controller
                     'doctor_qualification' => $pendingDoctor->qualification,
                     'doctor_experience'    => $pendingDoctor->experience,
                     'doctor_bio'           => $pendingDoctor->bio,
-                    'doctor_license'  => $pendingDoctor->license_path,
+                   // 'doctor_license'  => $pendingDoctor->license_path,
                     'doctor_certificate' => $pendingDoctor->certificate_path,
                     'doctor_image'    => $pendingDoctor->image_path,
                     'doctor_phone'    => $pendingDoctor->phone,

@@ -73,6 +73,7 @@ public function recordMedications()
     return $this->hasMany(RecordMedication::class, 'medical_record_id', 'medical_record_id');
 }
 
+
 }
 
   

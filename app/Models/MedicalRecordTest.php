@@ -27,8 +27,11 @@ class MedicalRecordTest extends Model
     }
 
     // تعريف العلاقة مع الفحص (Test)
+  
     public function test()
-    {
-        return $this->belongsTo(Test::class, 'test_id');
-    }
+{
+    return $this->belongsTo(Test::class, 'test_id');
+}
+
+
 }

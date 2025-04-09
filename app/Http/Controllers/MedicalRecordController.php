@@ -8,6 +8,7 @@ use App\Models\Test;
 use App\Models\Doctor;
 use App\Models\Hospital;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log; // تأكد من استيراد الفئة Log
@@ -113,17 +114,22 @@ class MedicalRecordController extends Controller
     }
     
 
-
-//جلب اسماء المرضى
+// جلب جميع السجلات الطبية للمرضى التي تم علاجهم في المستشفى الحالي
 public function getHospitalPatients()
 {
     $user = Auth::user();
-    
+
     if ($user && $user->hospital_id) {
         $hospitalId = $user->hospital_id;
 
+        // جلب جميع السجلات الطبية للمرضى الذين تم علاجهم في المستشفى الحالي
         $patients = MedicalRecord::with('patient')
-            ->where('hospital_id', $hospitalId)
+            ->where('hospital_id', $hospitalId)  // جلب السجلات التي تخص المستشفى الحالي
+            ->orWhereHas('patient', function ($query) use ($hospitalId) {
+                $query->whereHas('medicalRecords', function ($q) use ($hospitalId) {
+                    $q->where('hospital_id', $hospitalId);  // التأكد من أن المريض قد تعالج في هذا المستشفى سابقًا
+                });
+            })
             ->get()
             ->unique('patient_id')  // لتجنب التكرار
             ->map(function ($record) {
@@ -139,31 +145,44 @@ public function getHospitalPatients()
     return response()->json(['error' => 'Hospital ID not found in token'], 404);
 }
 
-//جلب تواريخ السجلات الطبية للمرضى
+// جلب تواريخ السجلات الطبية لجميع المرضى الذين قد تعالجوا في المستشفى الحالي
 public function getPatientRecordsDates($patientId)
 {
     Log::info("🔍 البحث عن السجلات الطبية للمريض ID: $patientId");
 
-    $dates = MedicalRecord::where('patient_id', $patientId)
-        ->select('medical_record_id', 'created_at')
-        ->orderBy('created_at', 'desc')
-        ->get();
+    $user = Auth::user();
 
-    Log::info("📊 عدد السجلات المسترجعة: " . $dates->count());
+    if ($user && $user->hospital_id) {
+        $hospitalId = $user->hospital_id;  // معرّف المستشفى من التوكن
 
-    if ($dates->isEmpty()) {
-        Log::warning("⚠ لا توجد سجلات للمريض ID: $patientId");
-        return response()->json(['message' => 'لم يتم العثور على أي سجلات لهذا المريض'], 404);
+        // جلب جميع السجلات الطبية للمريض الذي تم علاجه في المستشفى الحالي
+        $dates = MedicalRecord::where('patient_id', $patientId)
+            ->where(function ($query) use ($hospitalId) {
+                $query->where('hospital_id', $hospitalId)  // جلب السجلات الخاصة بالمستشفى الحالي
+                    ->orWhereHas('patient.medicalRecords', function ($q) use ($hospitalId) {
+                        $q->where('hospital_id', $hospitalId);  // التأكد أن المريض قد تعالج في هذا المستشفى من قبل
+                    });
+            })
+            ->select('medical_record_id', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        Log::info("📊 عدد السجلات المسترجعة: " . $dates->count());
+
+        if ($dates->isEmpty()) {
+            Log::warning("⚠ لا توجد سجلات للمريض ID: $patientId في المستشفى ID: $hospitalId");
+            return response()->json(['message' => 'لم يتم العثور على أي سجلات لهذا المريض في المستشفى المحدد'], 404);
+        }
+
+        Log::info("✅ السجلات المسترجعة: ", $dates->toArray());
+
+        return response()->json($dates);
     }
 
-    Log::info("✅ السجلات المسترجعة: ", $dates->toArray());
-
-    return response()->json($dates);
+    return response()->json(['error' => 'Hospital ID not found in token'], 404);
 }
 
-
-
-//جلب سجلات المرضى المستشفى
+// جلب تفاصيل السجلات الطبية للمريض في المستشفى الحالي
 public function getHospitalRecordDetails($medicalRecordId)
 {
     // استخراج المستخدم من التوكن
@@ -173,31 +192,38 @@ public function getHospitalRecordDetails($medicalRecordId)
     if ($user && $user->hospital_id) {
         $hospitalId = $user->hospital_id;  // معرّف المستشفى من التوكن
 
-        // جلب السجل الطبي المطلوب بناءً على معرفه وتأكد أنه تابع لهذا المستشفى
+        // جلب السجل الطبي المطلوب بناءً على معرفه وتأكد أنه تابع لهذا المستشفى أو تم علاجه في هذا المستشفى
         $record = MedicalRecord::with([
-            'patient', 
-            'doctor', 
-            'medicalRecordTests.test', 
+            'patient',
+            'doctor',
+            'medicalRecordTests.test',
             'recordMedications.medication'
         ])
-        ->where('hospital_id', $hospitalId)
+        ->where(function ($query) use ($hospitalId, $medicalRecordId) {
+            $query->where('hospital_id', $hospitalId)  // جلب السجل إذا كان خاص بالمستشفى الحالي
+                  ->orWhereHas('patient.medicalRecords', function ($q) use ($hospitalId) {
+                      $q->where('hospital_id', $hospitalId);  // التأكد من أن المريض قد تعالج في هذا المستشفى سابقًا
+                  });
+        })
         ->where('medical_record_id', $medicalRecordId)
-        ->first(); // جلب سجل واحد فقط
+        ->first(); // جلب السجل بناءً على المعرف
 
         // ✅ التحقق إذا لم يتم العثور على السجل
         if (!$record) {
-            return response()->json(['message' => 'لا يوجد سجل بهذا المعرف'], 404);
+            return response()->json(['message' => 'لا يوجد سجل بهذا المعرف في المستشفى المحدد أو المريض لم يتعالج هنا من قبل'], 404);
         }
 
         // تجهيز الاستجابة بالبيانات المطلوبة
         return response()->json([
             'patient_name' => $record->patient ? $record->patient->patient_name : null,  // اسم المريض
             'doctor_name' => $record->doctor ? $record->doctor->doctor_name : null,  // اسم الطبيب
+            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,  // اسم الطبيب
             'medical_record_id' => $record->medical_record_id,
             'patient_status' => $record->patient_status,  // حالة المريض
             'notes' => $record->notes,  // الملاحظات
-            'created_at' => $record->created_at->toDateTimeString(),  // 🟢 تاريخ الإنشاء
-            'updated_at' => $record->updated_at->toDateTimeString(),  // 🔵 تاريخ التحديث
+            
+            'created_at' => Carbon::parse($record->created_at)->format('d-m-Y h:i:s A'),
+            'updated_at' => Carbon::parse($record->updated_at)->format('d-m-Y h:i:s A'),
             'tests' => $record->medicalRecordTests->map(function ($test) {
                 return [
                     'test_name' => $test->test ? $test->test->test_name : null,  // اسم الفحص
@@ -216,74 +242,93 @@ public function getHospitalRecordDetails($medicalRecordId)
     return response()->json(['error' => 'Hospital ID not found in token'], 404);
 }
 
+ // جلب سجلات المرضى الخاصة بالطبيب
+ public function getDoctorPatients()
+ {
+     // استخراج المستخدم (الطبيب) من التوكن
+     $user = Auth::user();
 
-//جلب سجلات المرضى الخاصة بالطبيب
-public function getDoctorPatients()
-{
-    // استخراج المستخدم (الطبيب) من التوكن
-    $user = Auth::user();
+     // التحقق إذا كان المستخدم هو طبيب وله معرف خاص به
+     if ($user && $user->doctor_id) {
+         $doctorId = $user->doctor_id;  // معرّف الطبيب من التوكن
 
-    // التحقق إذا كان المستخدم هو طبيب وله معرف خاص به
-    if ($user && $user->doctor_id) {
-        $doctorId = $user->doctor_id;  // معرّف الطبيب من التوكن
+         // جلب السجلات الطبية المتعلقة بالطبيب مع تحميل العلاقة الخاصة بالمريض
+         $patients = MedicalRecord::with('patient')
+             ->where('doctor_id', $doctorId)  // هنا يتم التصفية حسب الطبيب
+             ->get()
+             ->unique('patient_id')  // لتجنب التكرار
+             ->map(function ($record) {
+                 return [
+                     'patient_id' => $record->patient_id,
+                     'patient_name' => $record->patient->patient_name,  // عرض اسم المريض
+                 ];
+             });
 
-        // جلب السجلات الطبية المتعلقة بالطبيب فقط مع تحميل العلاقة الخاصة بالمريض
-        $patients = MedicalRecord::with('patient')
-            ->where('doctor_id', $doctorId) // هنا يتم التصفية حسب الطبيب
-            ->get()
-            ->unique('patient_id')  // لتجنب التكرار
-            ->map(function ($record) {
-                return [
-                    'patient_id' => $record->patient_id,
-                    'patient_name' => $record->patient->patient_name, // عرض اسم المريض
-                ];
-            });
+         return response()->json($patients->values());
+     }
 
-        return response()->json($patients->values());
-    }
+     // إذا لم يكن هناك معرف للطبيب في التوكن
+     return response()->json(['error' => 'Doctor ID not found in token'], 404);
+ }
 
-    // إذا لم يكن هناك معرف للطبيب في التوكن
-    return response()->json(['error' => 'Doctor ID not found in token'], 404);
-}
+ // جلب تواريخ السجلات الطبية للمريض الخاصة بالطبيب
+ public function getDoctorPatientRecordsDates($patientId)
+ {
+     Log::info("🔍 البحث عن السجلات الطبية للمريض ID: $patientId للطبيب");
 
-//جلب تواريخ السجلات الطبية للمريض الخاصة بالطبيب
-public function getDoctorPatientRecordsDates($patientId)
-{
-    Log::info("🔍 البحث عن السجلات الطبية للمريض ID: $patientId للطبيب");
+     // استخراج المستخدم (الطبيب) من التوكن
+     $user = Auth::user();
 
-    // استخراج المستخدم (الطبيب) من التوكن
-    $user = Auth::user();
+     // التحقق إذا كان المستخدم هو طبيب وله معرف خاص به
+     if ($user && $user->doctor_id) {
+         $doctorId = $user->doctor_id;  // معرّف الطبيب من التوكن
 
-    // التحقق إذا كان المستخدم هو طبيب وله معرف خاص به
-    if ($user && $user->doctor_id) {
-        $doctorId = $user->doctor_id;  // معرّف الطبيب من التوكن
+         // التحقق إذا كان المريض قد تعالج عند هذا الطبيب
+         $patientRecords = MedicalRecord::where('patient_id', $patientId)
+             ->where('doctor_id', $doctorId) // تصفية السجلات حسب الطبيب
+             ->get();
 
-        // جلب السجلات الطبية المتعلقة بالطبيب
-        $dates = MedicalRecord::where('patient_id', $patientId)
-            ->where('doctor_id', $doctorId) // تصفية السجلات حسب الطبيب
-            ->select('medical_record_id', 'created_at')
-            ->orderBy('created_at', 'desc')
-            ->get();
+         // إذا كان المريض قد تعالج عند الطبيب، نقوم بجلب جميع سجلاته
+         if ($patientRecords->isNotEmpty()) {
+             $dates = MedicalRecord::where('patient_id', $patientId)
+                 ->select('medical_record_id', 'created_at')
+                 ->orderBy('created_at', 'desc')
+                 ->get();
+         } else {
+             // إذا لم يكن قد تعالج عند الطبيب هذا فقط نظهر السجلات الخاصة بهذا الطبيب
+             $dates = MedicalRecord::where('patient_id', $patientId)
+                 ->where('doctor_id', $doctorId)
+                 ->select('medical_record_id', 'created_at')
+                 ->orderBy('created_at', 'desc')
+                 ->get();
+         }
 
-        Log::info("📊 عدد السجلات المسترجعة: " . $dates->count());
+         Log::info("📊 عدد السجلات المسترجعة: " . $dates->count());
 
-        if ($dates->isEmpty()) {
-            Log::warning("⚠ لا توجد سجلات للمريض ID: $patientId للطبيب ID: $doctorId");
-            return response()->json(['message' => 'لم يتم العثور على أي سجلات لهذا المريض للطبيب المحدد'], 404);
-        }
+         if ($dates->isEmpty()) {
+             Log::warning("⚠ لا توجد سجلات للمريض ID: $patientId للطبيب ID: $doctorId");
+             return response()->json(['message' => 'لم يتم العثور على أي سجلات لهذا المريض للطبيب المحدد'], 404);
+         }
 
-        Log::info("✅ السجلات المسترجعة: ", $dates->toArray());
+         // تحويل التواريخ إلى صيغة مفهومة للمستخدم
+         $formattedDates = $dates->map(function ($date) {
+             return [
+                 'medical_record_id' => $date->medical_record_id,
+                 'created_at'=>   Carbon::parse($date->created_at)->format('d-m-Y h:i:s A'),
+              //   'created_at' => $date->created_at->format('d-m-Y H:i'), // تنسيق التاريخ بشكل مفهوم
+             ];
+         });
 
-        return response()->json($dates);
-    }
+         Log::info("✅ السجلات المسترجعة: ", $formattedDates->toArray());
 
-    // إذا لم يكن هناك معرف للطبيب في التوكن
-    return response()->json(['error' => 'Doctor ID not found in token'], 404);
-}
+         return response()->json($formattedDates);
+     }
 
+     // إذا لم يكن هناك معرف للطبيب في التوكن
+     return response()->json(['error' => 'Doctor ID not found in token'], 404);
+ }
 
-//جلب التفاصيل السجل   للمريض الخاص بالطبيب
-public function getDoctorRecordDetails($medicalRecordId)
+ public function getDoctorRecordDetails($medicalRecordId)
 {
     // استخراج المستخدم (الطبيب) من التوكن
     $user = Auth::user();
@@ -292,15 +337,16 @@ public function getDoctorRecordDetails($medicalRecordId)
     if ($user && $user->doctor_id) {
         $doctorId = $user->doctor_id;  // معرّف الطبيب من التوكن
 
-        // جلب السجل الطبي المطلوب بناءً على معرفه والتأكد من أنه تابع للطبيب
+        // جلب السجل الطبي المطلوب بناءً على معرفه
         $record = MedicalRecord::with([
             'patient', 
             'hospital', 
+            'doctor',
             'medicalRecordTests.test', 
             'recordMedications.medication'
         ])
-        ->where('doctor_id', $doctorId)  // تصفية السجلات حسب الطبيب
-        ->where('medical_record_id', $medicalRecordId)  // جلب السجل بناءً على المعرف
+        // نبحث عن السجل بناءً على المعرف فقط، بغض النظر عن الطبيب
+        ->where('medical_record_id', $medicalRecordId)  
         ->first(); // جلب سجل واحد فقط
 
         // ✅ التحقق إذا لم يتم العثور على السجل
@@ -308,15 +354,29 @@ public function getDoctorRecordDetails($medicalRecordId)
             return response()->json(['message' => 'لا يوجد سجل بهذا المعرف للطبيب المحدد'], 404);
         }
 
-        // تجهيز الاستجابة بالبيانات المطلوبة
+        // التحقق إذا كان الطبيب قد تعامل مع هذا المريض سابقًا
+        if ($record->doctor_id !== $doctorId) {
+            // إذا لم يكن الطبيب الحالي هو من قام بفتح السجل، نقوم بالتحقق من وجود سجل له سابقًا
+            $hasSeenPatientBefore = MedicalRecord::where('patient_id', $record->patient_id)
+                ->where('doctor_id', $doctorId)
+                ->exists();
+
+            // إذا كان قد عالج المريض سابقًا، يسمح له بالوصول إلى السجل
+            if (!$hasSeenPatientBefore) {
+                return response()->json(['message' => 'لا يمكنك الوصول إلى هذا السجل لأنك لم تعالج المريض من قبل.'], 403);
+            }
+        }
+
+        // تجهيز الاستجابة بالبيانات المطلوبة مع تنسيق التواريخ
         return response()->json([
             'patient_name' => $record->patient ? $record->patient->patient_name : null,  // اسم المريض
-            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,  // اسم الطبيب
+            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,  // اسم المستشفى
+            'doctor_name' => $record->doctor ? $record->doctor->doctor_name : null,  // اسم الطبيب
             'medical_record_id' => $record->medical_record_id,
             'patient_status' => $record->patient_status,  // حالة المريض
             'notes' => $record->notes,  // الملاحظات
-            'created_at' => $record->created_at->toDateTimeString(),  // 🟢 تاريخ الإنشاء
-            'updated_at' => $record->updated_at->toDateTimeString(),  // 🔵 تاريخ التحديث
+            'created_at' =>Carbon::parse($record->created_at)->format('d-m-Y h:i:s A'),
+            'updated_at' => Carbon::parse($record->updated_at)->format('d-m-Y h:i:s A'), // 🔵 تاريخ التحديث بتنسيق مفهم
             'tests' => $record->medicalRecordTests->map(function ($test) {
                 return [
                     'test_name' => $test->test ? $test->test->test_name : null,  // اسم الفحص
@@ -333,6 +393,88 @@ public function getDoctorRecordDetails($medicalRecordId)
 
     // إذا لم يكن هناك معرف للطبيب في التوكن
     return response()->json(['error' => 'Doctor ID not found in token'], 404);
+}
+
+
+
+// جلب تواريخ السجلات الطبية الخاصة بالمريض المسجل دخوله
+public function getPatientRecordsDatesforpatient()
+{
+    // استخراج المريض من التوكن
+    $user = Auth::user();
+
+    if ($user && $user->patient_id) {
+        $patientId = $user->patient_id;
+
+        // جلب تواريخ السجلات الطبية الخاصة بالمريض
+        $dates = MedicalRecord::where('patient_id', $patientId)
+            ->select('medical_record_id', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // التحقق إذا كانت السجلات فارغة
+        if ($dates->isEmpty()) {
+            return response()->json(['message' => 'لم يتم العثور على أي سجلات لهذا المريض'], 404);
+        }
+
+        // إرجاع التواريخ
+        return response()->json($dates);
+    }
+
+    // إذا لم يتم العثور على معرّف المريض في التوكن
+    return response()->json(['error' => 'Patient ID not found in token'], 404);
+}
+
+// جلب تفاصيل السجل الطبي للمريض بناءً على تاريخ معين
+public function getPatientRecordDetailsforpatient($medicalRecordId)
+{
+    // استخراج المريض من التوكن
+    $user = Auth::user();
+
+    if ($user && $user->patient_id) {
+        $patientId = $user->patient_id;
+
+        // جلب السجل الطبي بناءً على معرفه
+        $record = MedicalRecord::with([
+            'doctor', 
+            'medicalRecordTests.test', 
+            'recordMedications.medication'
+        ])
+        ->where('patient_id', $patientId)  // التحقق أن السجل يخص المريض المسجل دخوله
+        ->where('medical_record_id', $medicalRecordId)
+        ->first(); // جلب السجل بناءً على المعرف
+
+        // ✅ التحقق إذا لم يتم العثور على السجل
+        if (!$record) {
+            return response()->json(['message' => 'لا يوجد سجل بهذا المعرف للمريض'], 404);
+        }
+
+        // تجهيز الاستجابة بالبيانات المطلوبة
+        return response()->json([
+            'doctor_name' => $record->doctor ? $record->doctor->doctor_name : null,  // اسم الطبيب
+            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,  // اسم المستشفى
+           
+            'medical_record_id' => $record->medical_record_id,
+            'patient_status' => $record->patient_status,  // حالة المريض
+            'notes' => $record->notes,  // الملاحظات
+            'created_at' => Carbon::parse($record->created_at)->format('d-m-Y h:i:s A'), // 🟢 تاريخ الإنشاء
+            'updated_at' => Carbon::parse($record->updated_at)->format('d-m-Y h:i:s A'),// 🔵 تاريخ التحديث
+            'tests' => $record->medicalRecordTests->map(function ($test) {
+                return [
+                    'test_name' => $test->test ? $test->test->test_name : null,  // اسم الفحص
+                    'result_value' => $test->result_value,  // نتيجة الفحص
+                ];
+            }),
+            'medications' => $record->recordMedications->map(function ($medication) {
+                return [
+                    'medication_name' => $medication->medication ? $medication->medication->medication_name : null,  // اسم الدواء
+                ];
+            }),
+        ]);
+    }
+
+    // إذا لم يتم العثور على معرّف المريض في التوكن
+    return response()->json(['error' => 'Patient ID not found in token'], 404);
 }
 
 }

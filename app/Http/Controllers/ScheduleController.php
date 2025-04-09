@@ -80,8 +80,8 @@ if (!$schedule) {
       //  'proposed_start_time' => $schedule->proposed_start_time,
       //  'proposed_end_time' => $schedule->proposed_end_time,
         'status' => $schedule->status,
-        'created_at' => Carbon::parse($schedule->created_at)->format('Y-m-d h:i A'),
-        'updated_at' => Carbon::parse($schedule->updated_at)->format('Y-m-d h:i A'),
+        'created_at' => Carbon::parse($schedule->created_at)->format('d-m-Y h:i:s A'),
+        'updated_at' => Carbon::parse($schedule->updated_at)->format('d-m-Y h:i:s A'),
     ]);
 }
 public function store(Request $request)
@@ -114,6 +114,7 @@ public function store(Request $request)
         'day_of_week' => 'required|string',
         'start_time' => 'required',
         'end_time' => 'required',
+        
     ]);
 
     // إضافة الموعد
@@ -258,4 +259,42 @@ public function update(Request $request, $id)
     }
     
     
+
+
+    // 🔹 عرض مواعيد الطبيب بناءً على اختيار المريض
+public function showDoctorSchedules($doctorId)
+{
+    // جلب مواعيد الطبيب بناءً على doctor_id
+    $schedules = Schedule::where('doctor_id', $doctorId)
+        ->with([
+            'doctor' => function ($query) {
+                $query->select('doctor_id', 'doctor_name');
+            },
+            'hospital' => function ($query) {
+                $query->select('hospital_id', 'hospital_name');
+            }
+        ])
+        ->get()
+        ->map(function ($schedule) {
+            return [
+                'schedule_id' => $schedule->schedule_id,
+                'doctor_name' => $schedule->doctor->doctor_name ?? 'غير معروف',
+                'hospital_name' => $schedule->hospital->hospital_name ?? 'غير معروف',
+                'day_of_week' => $schedule->day_of_week,
+                'start_time' => Carbon::parse($schedule->start_time)->format('h:i A'),
+                'end_time' => Carbon::parse($schedule->end_time)->format('h:i A'),
+                'status' => $schedule->status,
+                'created_at' => Carbon::parse($schedule->created_at)->format('d-m-Y h:i A'),
+                'updated_at' => Carbon::parse($schedule->updated_at)->format('d-m-Y h:i A'),
+            ];
+        });
+
+    // إذا لم يكن هناك مواعيد
+    if ($schedules->isEmpty()) {
+        return response()->json(['message' => 'لا يوجد مواعيد لهذا الطبيب'], 404);
+    }
+
+    return response()->json($schedules);
+}
+
 }
