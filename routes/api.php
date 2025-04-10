@@ -7,7 +7,8 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      OTPController, TipController, TipLikeController, NotificationController, 
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
-      MedicalRecordController,MedicationController,TestController,EmergencyController,AmbulanceRescueController};
+      MedicalRecordController,MedicationController,TestController,
+      EmergencyController,AmbulanceRescueController,DoctorRatingController};
 
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -23,6 +24,7 @@ Route::prefix('auth')->group(function () {
 // ✅ المسارات المحمية (تتطلب توكن)
 Route::middleware('auth:api')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
+    
 
     // ✅ إدارة المرضى
     Route::prefix('patients')->group(function () {
@@ -42,6 +44,7 @@ Route::middleware('auth:api')->group(function () {
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
         Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);
+          
 
 
        
@@ -49,7 +52,7 @@ Route::middleware('auth:api')->group(function () {
         
 
     }); //Route::get('/profile', [DoctorController::class, 'profile']);
-
+    Route::post('/rate-doctor/{doctor_id}', [DoctorRatingController::class, 'rateDoctor']);   
     // ✅ إدارة المستشفيات
     Route::prefix('hospitals')->group(function () {
         Route::post('/register', [HospitalController::class, 'register']);
@@ -238,4 +241,6 @@ Route::post('/accept-other/{notificationId}', [EmergencyController::class, 'acce
 Route::put('/ambulance/{rescueId}/mark-fake', [EmergencyController::class, 'markFakeAmbulanceRequest']);
 
 });
+
+
 });

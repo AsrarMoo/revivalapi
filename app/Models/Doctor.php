@@ -38,5 +38,8 @@ public function hospitals()
 {
     return $this->belongsToMany(Hospital::class, 'hospital_doctors', 'doctor_id', 'hospital_id');
 }
-
+public function doctor_rataing()
+{
+    return $this->hasMany(DoctorRating::class, 'doctor_id', 'doctor_id');
+}
 }
