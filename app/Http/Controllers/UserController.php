@@ -98,14 +98,17 @@ class UserController extends Controller
             'email' => "sometimes|string|email|max:255|unique:users,email,$id,user_id",
             'password' => 'sometimes|string|min:6',
             'user_type' => ['sometimes', Rule::in(['patient', 'doctor', 'hospital', 'admin'])],
-            'is_active' => 'sometimes|boolean',
+            'is_active' => 'sometimes|in:0,1', // التحقق من أن القيمة إما 0 أو 1
         ]);
+    
+        // تأكد من أن قيمة is_active هي إما 1 أو 0
+        $is_active = in_array($request->is_active, [0, 1]) ? $request->is_active : $user->is_active;
     
         $user->update([
             'email' => $request->email ?? $user->email,
             'password' => $request->password ? Hash::make($request->password) : $user->password,
             'user_type' => $request->user_type ?? $user->user_type,
-            'is_active' => $request->is_active ?? $user->is_active,
+            'is_active' => $is_active,  // استخدام القيمة المعدلة
             'doctor_id' => $request->doctor_id ?? $user->doctor_id,
             'hospital_id' => $request->hospital_id ?? $user->hospital_id,
             'health_ministry_id' => $request->health_ministry_id ?? $user->health_ministry_id,
@@ -132,14 +135,13 @@ class UserController extends Controller
                 'patient' => $user->patient?->patient_name,
                 default => null,
             },
-            'created_at' => Carbon::parse($user->created_at)->format('Y-m-d h:i A'), // ⬅️ صيغة مفهومة
+            'created_at' => Carbon::parse($user->created_at)->format('Y-m-d h:i A'),
             'updated_at' => Carbon::parse($user->updated_at)->format('Y-m-d h:i A'),
         ];
     
         return response()->json($userData);
     }
     
-   
  
     
      // جلب جميع أسماء المستخدمين فقط
