@@ -145,6 +145,7 @@ class PatientController extends Controller
     
             // ✅ إرجاع بيانات المريض
             return response()->json([
+                'patient_id'=>$patient->patient_id,
                 'name' => $patient->patient_name,
                 'image' => $patient->patient_image,
             ], 200);
