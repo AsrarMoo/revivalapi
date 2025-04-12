@@ -43,8 +43,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
         Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
-        Route::get('/hospitals', [DoctorController::class, 'getHospitals']);
-          
+        Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
+        Route::get('/image', [DoctorController::class, 'simpleDoctors']);
 
 
        

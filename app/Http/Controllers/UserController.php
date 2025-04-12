@@ -27,7 +27,7 @@ class UserController extends Controller
                 //'name' => $user->name,
                 'email' => $user->email,
                 'user_type' => $user->user_type,
-                'is_active' => $user->is_active,
+                'is_active' => $user->is_active ? 1 : 0,  // تغيير هنا لاستخدام 1 أو 0 بدلاً من true أو false
                 'associated_name' => match ($user->user_type) {
                     'doctor' => $user->doctor?->doctor_name,
                     'hospital' => $user->hospital?->hospital_name,
@@ -43,8 +43,6 @@ class UserController extends Controller
         return response()->json($users);
     }
     
-    
-
     // جلب مستخدم واحد
     public function show($id)
     {
@@ -64,7 +62,7 @@ class UserController extends Controller
             'user_id' => $user->user_id,
             'email' => $user->email,
             'user_type' => $user->user_type,
-            'is_active' => $user->is_active,
+            'is_active' => $user->is_active ? 1 : 0,  // تغيير هنا لاستخدام 1 أو 0 بدلاً من true أو false
             'associated_name' => match ($user->user_type) {
                 'doctor' => $user->doctor?->doctor_name,
                 'hospital' => $user->hospital?->hospital_name,
@@ -79,7 +77,6 @@ class UserController extends Controller
         return response()->json($userData);
     }
     
-
     // تحديث بيانات مستخدم
     public function update(Request $request, $id)
     {
@@ -127,7 +124,7 @@ class UserController extends Controller
             'user_id' => $user->user_id,
             'email' => $user->email,
             'user_type' => $user->user_type,
-            'is_active' => $user->is_active,
+            'is_active' => $user->is_active ? 1 : 0,  // تغيير هنا لاستخدام 1 أو 0 بدلاً من true أو false
             'associated_name' => match ($user->user_type) {
                 'doctor' => $user->doctor?->doctor_name,
                 'hospital' => $user->hospital?->hospital_name,
@@ -141,69 +138,68 @@ class UserController extends Controller
     
         return response()->json($userData);
     }
-    
- 
-    
-     // جلب جميع أسماء المستخدمين فقط
-public function getNames()
-{
-    $users = User::with([
-        'doctor:doctor_id,doctor_name',
-        'hospital:hospital_id,hospital_name',
-        'healthMinistry:health_ministry_id,health_ministry_name',
-        'patient:patient_id,patient_name'
-    ])->get();
 
-    $names = $users->map(function ($user) {
-        return $user->doctor?->doctor_name ??
-               $user->hospital?->hospital_name ??
-               $user->healthMinistry?->health_ministry_name ??
-               $user->patient?->patient_name ??
-               null;
-    })->filter(); // حذف القيم الفارغة
+    // جلب جميع أسماء المستخدمين فقط
+    public function getNames()
+    {
+        $users = User::with([
+            'doctor:doctor_id,doctor_name',
+            'hospital:hospital_id,hospital_name',
+            'healthMinistry:health_ministry_id,health_ministry_name',
+            'patient:patient_id,patient_name'
+        ])->get();
 
-    return response()->json($names);
-}
+        $names = $users->map(function ($user) {
+            return $user->doctor?->doctor_name ??
+                   $user->hospital?->hospital_name ??
+                   $user->healthMinistry?->health_ministry_name ??
+                   $user->patient?->patient_name ??
+                   null;
+        })->filter(); // حذف القيم الفارغة
 
-// إرجاع قائمة بأنواع المستخدمين يدويًا
-public function getUserTypes()
-{
-    $types = ['patient', 'doctor', 'hospital', 'admin'];
-    return response()->json($types);
-}
-public function destroy($id)
-{
-    $user = User::with([
-        'doctor:doctor_id,doctor_name',
-        'hospital:hospital_id,hospital_name',
-        'healthMinistry:health_ministry_id,health_ministry_name',
-        'patient:patient_id,patient_name'
-    ])->find($id);
-
-    if (!$user) {
-        return response()->json(['message' => 'User not found'], 404);
+        return response()->json($names);
     }
 
-    // حفظ بيانات المستخدم قبل الحذف لعرضها في الاستجابة
-    $userData = [
-        'user_id' => $user->user_id,
-        'email' => $user->email,
-        'user_type' => $user->user_type,
-        'associated_name' => match ($user->user_type) {
-            'doctor' => $user->doctor?->doctor_name,
-            'hospital' => $user->hospital?->hospital_name,
-            'healthMinistry' => $user->healthMinistry?->health_ministry_name,
-            'patient' => $user->patient?->patient_name,
-            default => null,
+    // إرجاع قائمة بأنواع المستخدمين يدويًا
+    public function getUserTypes()
+    {
+        $types = ['patient', 'doctor', 'hospital', 'admin'];
+        return response()->json($types);
+    }
+
+    // حذف مستخدم
+    public function destroy($id)
+    {
+        $user = User::with([
+            'doctor:doctor_id,doctor_name',
+            'hospital:hospital_id,hospital_name',
+            'healthMinistry:health_ministry_id,health_ministry_name',
+            'patient:patient_id,patient_name'
+        ])->find($id);
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
         }
-    ];
 
-    $user->delete();
+        // حفظ بيانات المستخدم قبل الحذف لعرضها في الاستجابة
+        $userData = [
+            'user_id' => $user->user_id,
+            'email' => $user->email,
+            'user_type' => $user->user_type,
+            'associated_name' => match ($user->user_type) {
+                'doctor' => $user->doctor?->doctor_name,
+                'hospital' => $user->hospital?->hospital_name,
+                'healthMinistry' => $user->healthMinistry?->health_ministry_name,
+                'patient' => $user->patient?->patient_name,
+                default => null,
+            }
+        ];
 
-    return response()->json([
-        'message' => 'User deleted successfully',
-        'deleted_user' => $userData
-    ]);
-}
+        $user->delete();
 
+        return response()->json([
+            'message' => 'User deleted successfully',
+            'deleted_user' => $userData
+        ]);
+    }
 }

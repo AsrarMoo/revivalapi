@@ -479,6 +479,20 @@ public function getProfile()
             ], 500);
         }
     }
-    
+    // ✅ دالة جديدة ترجع فقط الاسم + الصورة + التخصص
+public function simpleDoctors()
+{
+    $doctors = Doctor::with('specialty:specialty_id,specialty_name')
+        ->get()
+        ->map(function ($doctor) {
+            return [
+                'name' => $doctor->doctor_name,
+                'image' => $doctor->doctor_image,
+                'specialty' => $doctor->specialty->specialty_name ?? 'غير محدد',
+            ];
+        });
+
+    return response()->json($doctors);
+}
 }
   
