@@ -352,5 +352,42 @@ public function cancelAppointment(Request $request, $appointmentId)
     return response()->json(['message' => 'تم إلغاء الحجز بنجاح.'], 200);
 }
 
+public function getPatientAppointments()
+{
+    // جلب المستخدم الحالي
+    $user = auth()->user();
+
+    // التأكد من أن المستخدم لديه patient_id
+    if (!$user->patient_id) {
+        return response()->json(['error' => 'المستخدم ليس مريضاً.'], 403);
+    }
+
+    // جلب حجوزات المريض
+    $appointments = Appointment::where('patient_id', $user->patient_id)
+                                ->with(['doctor', 'hospital', 'schedule'])
+                                ->get();
+
+    if ($appointments->isEmpty()) {
+        return response()->json(['message' => 'لا توجد حجوزات لهذا المريض.'], 404);
+    }
+
+    // إرجاع بيانات الحجز
+    return response()->json([
+        'appointments' => $appointments->map(function ($appointment) {
+            return [
+                'appointment_id' => $appointment->appointment_id,
+                'doctor_name' => $appointment->doctor->doctor_name ?? null,
+                'hospital_name' => $appointment->hospital->hospital_name ?? null,
+                'day_of_week' => $appointment->schedule->day_of_week ?? null,
+                'start_time' => Carbon::parse($appointment->schedule->start_time)->translatedFormat('g:i A') ?? null,
+                'end_time' => Carbon::parse($appointment->schedule->end_time)->translatedFormat('g:i A') ?? null,
+                'status' => $appointment->status,
+                'created_at' => Carbon::parse($appointment->created_at)->translatedFormat('l j F Y - g:i A'),
+            ];
+        }),
+    ], 200);
+}
+
+
 }
  
