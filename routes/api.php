@@ -45,6 +45,8 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
+        Route::get('/{id}', [DoctorController::class, 'showById']);
+       
 
 
        

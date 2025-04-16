@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Doctor;
 use App\Models\DoctorRating;
+use App\Models\Notification; // إضافة هذا السطر لاستيراد موديل الإشعارات
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Log;
 
 class DoctorRatingController extends Controller
-{public function rateDoctor(Request $request, $doctor_id)
+{
+    public function rateDoctor(Request $request, $doctor_id)
     {
         // التحقق من تسجيل الدخول
         $patient = Auth::user();
@@ -18,18 +20,26 @@ class DoctorRatingController extends Controller
         // التحقق من وجود الحجز
         $appointment = Appointment::where('doctor_id', $doctor_id)
                                    ->where('patient_id', $patient->user_id)
-                                   ->where('status', 'Confirmed') // التأكد من أن الحالة "مؤكد"
+                                   ->whereIn('status', ['Confirmed', 'Completed']) // التأكد من أن الحالة "مؤكد" أو "مكتمل"
                                    ->first();
     
         if (!$appointment) {
             return response()->json(['error' => 'لم تجد حجزًا مع الطبيب هذا.'], 404);
         }
-    
-        // التحقق من مرور 24 ساعة على الحجز
-        $timeDifference = now()->diffInHours($appointment->created_at);
+
+        // جلب معلومات الموعد من جدول المواعيد المرتبط
+        $schedule = $appointment->schedule;  // Assuming the relationship is defined in Appointment model
+        
+        if (!$schedule) {
+            return response()->json(['error' => 'لم يتم العثور على الموعد المرتبط بهذا الحجز.'], 404);
+        }
+        
+        // استخدم وقت بداية الموعد (start_time) من جدول المواعيد
+        $appointmentTime = Carbon::parse($schedule->start_time); // تأكد من أن "start_time" هو اسم العمود في جدول المواعيد
+        $timeDifference = now()->diffInHours($appointmentTime);
     
         if ($timeDifference > 24) {
-            return response()->json(['error' => 'لقد تجاوزت الوقت المسموح به للتقييم (24 ساعة).'], 400);
+            return response()->json(['error' => 'لقد تجاوزت الوقت المسموح به للتقييم (24 ساعة من وقت الموعد).'], 400);
         }
     
         // التحقق من أن المريض لم يقيم من قبل
@@ -51,9 +61,17 @@ class DoctorRatingController extends Controller
             'knowledge_experience' => $request->knowledge_experience,
             'punctuality' => $request->punctuality,
         ]);
-    
-        return response()->json(['message' => 'تم التقييم بنجاح.'], 200);
+
+        // إنشاء الإشعار للطبيب
+        $notification = Notification::create([
+            'user_id' => $doctor_id, // الطبيب الذي سيستقبل الإشعار
+            'created_by' => $patient->user_id, // المريض الذي قام بالتقييم
+            'title' => 'تم تقييمك', 
+            'message' => 'لقد قام المريض بتقييمك. تحقق من تقييمك.',
+            'type' => 'general',
+            'is_read' => 0, // الإشعار غير مقروء بعد
+        ]);
+
+        return response()->json(['message' => 'تم التقييم بنجاح. تم إرسال إشعار للطبيب.'], 200);
     }
-    
-    
 }

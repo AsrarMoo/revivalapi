@@ -298,7 +298,8 @@ class AppointmentController extends Controller
                         return [
                             'medical_record_id' => $record->medical_record_id,
                             'notes' => $record->notes,
-                            'created_at' => $record->created_at,
+                            'created_at' => Carbon::parse($record->created_at)->translatedFormat('j F Y، h:i A'),
+
                             
                             // اسم المستشفى
                             'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,

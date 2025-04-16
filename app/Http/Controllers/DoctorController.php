@@ -256,6 +256,43 @@ public function show()
 }
 
 
+public function showById($doctor_id)
+{
+    try {
+        // 🔹 التحقق من أن المعرف موجود في الطلب
+        if (!$doctor_id) {
+            return response()->json(['message' => 'المعرف غير موجود'], 400);
+        }
+
+        // 🔹 جلب بيانات الطبيب باستخدام doctor_id
+        $doctor = Doctor::with('specialty:specialty_id,specialty_name')
+                        ->where('doctor_id', $doctor_id)
+                        ->first();
+
+        // 🔹 التحقق من وجود الطبيب
+        if (!$doctor) {
+            return response()->json(['message' => 'لم يتم العثور على الطبيب'], 404);
+        }
+
+        // 🔹 إضافة رابط الصورة كامل
+        $doctor->doctor_image = url('storage/' . $doctor->doctor_image);
+
+        // 🔹 جلب الإيميل من جدول users بناءً على user_id
+        $userEmail = \App\Models\User::where('user_id', $doctor->user_id)->value('email');
+
+        // ✅ إضافة الإيميل إلى بيانات الطبيب
+        $doctor->doctor_email = $userEmail;
+
+        // ✅ إرجاع بيانات الطبيب مع رابط الصورة الكامل والإيميل
+        return response()->json($doctor);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'حدث خطأ أثناء جلب بيانات الطبيب',
+            'details' => $e->getMessage(),
+        ], 500);
+    }
+}
 
     // ✅ تسجيل طبيب جديد
     public function create(Request $request)
@@ -486,6 +523,7 @@ public function simpleDoctors()
         ->get()
         ->map(function ($doctor) {
             return [
+                'id'=>$doctor->doctor_id,
                 'name' => $doctor->doctor_name,
                 'image' => $doctor->doctor_image,
                 'specialty' => $doctor->specialty->specialty_name ?? 'غير محدد',
