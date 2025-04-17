@@ -17,4 +17,9 @@ class Specialty extends Model
         'specialty_name',
         'specialty_description',
     ];
+    // في موديل Specialty
+    public function doctors()
+    {
+        return $this->hasMany(Doctor::class, 'specialty_id', 'specialty_id');
+    }
 }

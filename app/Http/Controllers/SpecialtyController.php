@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 
 use App\Models\Specialty;
+use App\Models\Doctor;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+
+use Illuminate\Support\Facades\Log;
 
 
 class SpecialtyController extends Controller
@@ -79,4 +82,23 @@ class SpecialtyController extends Controller
         $specialty->delete();
         return response()->json(['message' => 'Specialty deleted successfully'], Response::HTTP_OK);
     }
+
+
+
+  // تأكد من إضافة هذا السطر في أعلى الملف
+
+  public function getSpecialtiesWithDoctorCount()
+  {
+      // استرجاع التخصصات مع عدد الأطباء لكل تخصص
+      $specialties = Specialty::select('specialty_id', 'specialty_name')
+                              ->withCount('doctors')
+                              ->get();
+  
+      // إرجاع البيانات المطلوبة
+      return response()->json($specialties);
+  }
+  
+  
+
+
 }

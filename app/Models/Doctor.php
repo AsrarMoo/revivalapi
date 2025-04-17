@@ -24,10 +24,12 @@ class Doctor extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
-    public function specialty()
-{
-    return $this->belongsTo(Specialty::class, 'specialty_id');
-}
+  // في موديل Doctor
+  // العلاقة بين الطبيب والتخصص
+  public function specialty()
+  {
+      return $this->belongsTo(Specialty::class, 'specialty_id', 'specialty_id');
+  }
 // في نموذج Doctor
 
 public function medicalRecords()
@@ -42,4 +44,5 @@ public function doctor_rataing()
 {
     return $this->hasMany(DoctorRating::class, 'doctor_id', 'doctor_id');
 }
+
 }
