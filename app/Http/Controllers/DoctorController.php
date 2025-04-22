@@ -79,7 +79,7 @@ class DoctorController extends Controller
     
                 // ✅ إرسال إشعار إلى وزارة الصحة
                 Notification::create([
-                    'user_id'    => 1, // ID وزارة الصحة
+                    'user_id'    => 47, // ID وزارة الصحة
                     'created_by' => auth()->id(),
                     'type'       => 'Requesting',
                     'title'      => 'طلب تسجيل طبيب جديد',

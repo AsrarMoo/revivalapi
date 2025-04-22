@@ -8,7 +8,7 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
       MedicalRecordController,MedicationController,TestController,
-      EmergencyController,AmbulanceRescueController,DoctorRatingController};
+      EmergencyController,AmbulanceRescueController,DoctorRatingController,PendingDoctorController};
 
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -246,6 +246,8 @@ Route::post('/accept-other/{notificationId}', [EmergencyController::class, 'acce
 Route::put('/ambulance/{rescueId}/mark-fake', [EmergencyController::class, 'markFakeAmbulanceRequest']);
 
 });
-
+Route::prefix('pending')->group(function() {
+    Route::get('/doctors', [PendingDoctorController::class, 'index']);
+});
 
 });
