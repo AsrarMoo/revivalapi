@@ -62,7 +62,7 @@ class HospitalDoctorRequestController extends Controller
                     'created_by' => Auth::id(), // 🔹 استخدام user_id للمستشفى
                     'title' => 'طلب جديد لإضافة طبيب',
                     'message' => "قام المستشفى ({$hospital->hospital_name}) بإرسال طلب لإضافة الطبيب ({$doctor->doctor_name}).",
-                    'type' => 'general',
+                    'type' => 'adding',
                     'created_at' => now(),
                 ];
             }

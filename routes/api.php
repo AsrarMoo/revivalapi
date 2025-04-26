@@ -8,7 +8,7 @@ use App\Http\Controllers\{PatientController, AuthController, DoctorController,
      SpecialtyController, HospitalDoctorRequestController,
       HospitalDoctorRequestApprovalController , ScheduleController ,AppointmentController,
       MedicalRecordController,MedicationController,TestController,
-      EmergencyController,AmbulanceRescueController,DoctorRatingController};
+      EmergencyController,AmbulanceRescueController,DoctorRatingController,PendingDoctorController};
 
 
 // ✅ مسارات المصادقة (التسجيل وتسجيل الدخول)
@@ -74,7 +74,7 @@ Route::middleware('auth:api')->group(function () {
 
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
-        Route::put('/{id}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
+        Route::put('{request_id}/{action}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
        
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
     });
@@ -246,6 +246,8 @@ Route::post('/accept-other/{notificationId}', [EmergencyController::class, 'acce
 Route::put('/ambulance/{rescueId}/mark-fake', [EmergencyController::class, 'markFakeAmbulanceRequest']);
 
 });
-
+Route::prefix('pending')->group(function() {
+    Route::get('/doctors', [PendingDoctorController::class, 'index']);
+});
 
 });

@@ -11,35 +11,33 @@ use App\Models\Notification;
 class HospitalDoctorRequestApprovalController extends Controller
 {
     // قبول أو رفض الطلب من قبل وزارة الصحة
-    public function updateDoctorRequestStatus(Request $request, $request_id)
+    public function updateDoctorRequestStatus(Request $request, $request_id, $action)
     {
         $user = Auth::user();
-
-        // التأكد أن المستخدم هو "وزارة الصحة"
+    
         if (!$user || $user->user_type !== 'healthMinistry') {
             return response()->json(['error' => 'غير مصرح لك بإدارة الطلبات.'], 403);
         }
-
-        // البحث عن الطلب باستخدام request_id
+    
         $doctorRequest = HospitalDoctorRequest::where('request_id', $request_id)->first();
-
-        // التحقق مما إذا كان الطلب موجودًا
+    
         if (!$doctorRequest) {
-            return response()->json(['error' => 'الطلب غير موجود. تأكد من صحة المعرف'], 404);
+            return response()->json(['error' => 'الطلب غير موجود.'], 404);
         }
-
-        // التأكد أن الطلب لم يُعالج مسبقًا
+    
         if ($doctorRequest->status !== 'معلق') {
             return response()->json(['error' => 'تمت معالجة هذا الطلب بالفعل.'], 400);
         }
-
-        // التحقق من صحة الإدخال
-        $request->validate([
-            'status' => 'required|in:مقبول,مرفوض',
-        ]);
-
-        // تحديث حالة الطلب
-        $status = $request->input('status');
+    
+        // تحويل نوع العملية إلى status
+        if ($action === 'accept') {
+            $status = 'مقبول';
+        } elseif ($action === 'reject') {
+            $status = 'مرفوض';
+        } else {
+            return response()->json(['error' => 'نوع العملية غير معروف.'], 400);
+        }
+    
         $doctorRequest->status = $status;
         $doctorRequest->save();
 

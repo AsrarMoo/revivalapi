@@ -139,26 +139,37 @@ class UserController extends Controller
         return response()->json($userData);
     }
 
-    // جلب جميع أسماء المستخدمين فقط
-    public function getNames()
-    {
-        $users = User::with([
-            'doctor:doctor_id,doctor_name',
-            'hospital:hospital_id,hospital_name',
-            'healthMinistry:health_ministry_id,health_ministry_name',
-            'patient:patient_id,patient_name'
-        ])->get();
+// جلب جميع أسماء المستخدمين فقط
+public function getNames()
+{
+    // جلب المستخدمين مع بياناتهم المرتبطة (الأطباء، المستشفيات، وزارة الصحة، المرضى)
+    $users = User::with([
+        'doctor:doctor_id,doctor_name',
+        'hospital:hospital_id,hospital_name',
+        'healthMinistry:health_ministry_id,health_ministry_name',
+        'patient:patient_id,patient_name'
+    ])->get();
 
-        $names = $users->map(function ($user) {
-            return $user->doctor?->doctor_name ??
-                   $user->hospital?->hospital_name ??
-                   $user->healthMinistry?->health_ministry_name ??
-                   $user->patient?->patient_name ??
-                   null;
-        })->filter(); // حذف القيم الفارغة
+    // استخراج الأسماء فقط مع المعرفات
+    $names = $users->map(function ($user) {
+        // إذا كان المستخدم مرتبطًا بطبيب أو مستشفى أو وزارة صحة أو مريض، نحصل على الاسم المناسب
+        $name = $user->doctor?->doctor_name ??
+                $user->hospital?->hospital_name ??
+                $user->healthMinistry?->health_ministry_name ??
+                $user->patient?->patient_name ?? null;
+        
+        // إذا تم العثور على الاسم، نقوم بإرجاعه مع المعرف والمفتاح "name"
+        return $name ? [
+            'id' => $user->user_id, // معرف المستخدم
+            'name' => $name    // اسم المستخدم
+        ] : null;
+    })->filter(); // حذف القيم الفارغة
 
-        return response()->json($names);
-    }
+    // إعادة الاستجابة بصيغة JSON تحتوي على المعرفات والأسماء
+    return response()->json($names);
+}
+
+
 
     // إرجاع قائمة بأنواع المستخدمين يدويًا
     public function getUserTypes()

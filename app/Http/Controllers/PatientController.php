@@ -111,16 +111,34 @@ class PatientController extends Controller
     // ✅ استعلام عن جميع المرضى
     public function index()
     {
-        return response()->json(['patients' => Patient::all()], 200);
+        $patients = Patient::with('user:user_id,email')->get();
+    
+        $result = $patients->map(function ($patient) {
+            return [
+                'patient_id'         => $patient->patient_id,
+                'user_id'            => $patient->user_id,
+                'patient_name'       => $patient->patient_name,
+                'patient_age'        => $patient->patient_age,
+                'patient_birthdate'  => $patient->patient_birthdate,
+                'patient_blood_type' => $patient->patient_blood_type,
+                'patient_phone'      => $patient->patient_phone,
+                'patient_address'    => $patient->patient_address,
+                'patient_status'     => $patient->patient_status,
+                'patient_height'     => $patient->patient_height,
+                'patient_weight'     => $patient->patient_weight,
+                'patient_nationality'=> $patient->patient_nationality,
+                'patient_gender'     => $patient->patient_gender,
+                'patient_image'      => $patient->patient_image,
+                'patient_notes'      => $patient->patient_notes,
+                'created_at'         => $patient->created_at,
+                'updated_at'         => $patient->updated_at,
+                'email'              => $patient->user->email ?? null, // ← هنا الإيميل
+            ];
+        });
+    
+        return response()->json(['patients' => $result], 200);
     }
-
-    // ✅ استعلام عن مريض معين
-    public function show($id)
-    {
-        $patient = Patient::find($id);
-        return $patient ? response()->json(['patient' => $patient], 200)
-                         : response()->json(['message' => 'المريض غير موجود'], 404);
-    }
+    
   
     // ✅ جلب صورة واسم المريض
 
