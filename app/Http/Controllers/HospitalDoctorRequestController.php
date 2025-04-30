@@ -59,13 +59,16 @@ class HospitalDoctorRequestController extends Controller
             foreach ($admins as $admin_id) {
                 $notifications[] = [
                     'user_id' => $admin_id,
-                    'created_by' => Auth::id(), // 🔹 استخدام user_id للمستشفى
+                    'created_by' => Auth::id(),
                     'title' => 'طلب جديد لإضافة طبيب',
                     'message' => "قام المستشفى ({$hospital->hospital_name}) بإرسال طلب لإضافة الطبيب ({$doctor->doctor_name}).",
                     'type' => 'adding',
+                   
+                    'request_id' => $requestData->request_id, // 👈 هذا الجديد
                     'created_at' => now(),
                 ];
             }
+            
 
             Notification::insert($notifications);
         }
@@ -73,7 +76,7 @@ class HospitalDoctorRequestController extends Controller
         return response()->json([
             'message' => 'تم إرسال الطلب بنجاح!',
             'data' => [
-                'request_id' => $requestData->request_id,
+               // 'request_id' => $requestData->request_id,
                 'hospital_id' => $hospital->hospital_id,
                 'hospital_name' => $hospital->hospital_name,
                 'doctor_id' => $doctor->doctor_id,

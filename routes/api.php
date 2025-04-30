@@ -42,7 +42,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/profile', [DoctorController::class, 'show']);
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
-        Route::put('/approve-doctor/{doctorId}', [DoctorController::class, 'approveDoctor']);
+        Route::put('/approve-doctor/{createdBy}', [DoctorController::class, 'approveDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
         Route::get('/{id}', [DoctorController::class, 'showById']);
@@ -74,7 +74,7 @@ Route::middleware('auth:api')->group(function () {
 
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
-        Route::put('{request_id}/{action}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
+        Route::put('{notification_id}/{action}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
        
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
     });

@@ -111,7 +111,13 @@ class NotificationController extends Controller
         if (!$userId) {
             return 'غير معروف';
         }
-    
+       // 🔹 تحقق من أن الـ user_id هو من جدول pending_doctors (طلب تسجيل طبيب)
+    $pendingDoctor = \App\Models\PendingDoctor::find($userId);
+    if ($pendingDoctor) {
+        \Log::info("✅ الطبيب المؤقت موجود", ['pending_doctor_id' => $pendingDoctor->id]);
+        return $pendingDoctor->id; // إرجاع معرف الطبيب من جدول pending_doctors
+    }
+
         // 🔹 جلب بيانات المستخدم
         $user = \App\Models\User::select('user_id', 'user_type')->where('user_id', $userId)->first();
         \Log::info("🔍 تحقق من المستخدم", ['user_id' => $userId, 'user_type' => $user->user_type ?? 'NULL']);

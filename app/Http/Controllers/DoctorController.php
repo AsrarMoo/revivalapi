@@ -80,11 +80,12 @@ class DoctorController extends Controller
                 // ✅ إرسال إشعار إلى وزارة الصحة
                 Notification::create([
                     'user_id'    => 47, // ID وزارة الصحة
-                    'created_by' => auth()->id(),
+                    'created_by' => $pendingDoctor->id,
                     'type'       => 'Requesting',
                     'title'      => 'طلب تسجيل طبيب جديد',
                     'message'    => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']} (التخصص: {$specialty->specialty_name}).",  // إضافة اسم التخصص في الإشعار
                     'is_read'    => 0,
+                    'pending_doctor_id' => $pendingDoctor->id, // إضافة معرف الطبيب المعلق
                     'created_at' => now(),
                 ]);
     
@@ -100,8 +101,6 @@ class DoctorController extends Controller
             }
         });
     }
-    
-  
     public function approveDoctor(Request $request, $doctorId)
     {
         Log::info('البحث عن الطبيب في جدول pending_doctors', ['doctorId' => $doctorId]);
@@ -116,30 +115,29 @@ class DoctorController extends Controller
     
         Log::info('الطبيب موجود في قائمة الانتظار، التحقق من البيانات المدخلة');
     
-        // ✅ التحقق من صحة البيانات المدخلة (تأكد من التحقق الجيد للبيانات)
+        // ✅ التحقق من البيانات المدخلة إذا كان يحتاج لأي تحقق آخر
         $validatedData = $request->validate([
-            'password'  => 'required|min:6',
+            // يمكن التحقق من الحقول الأخرى إذا لزم الأمر
         ]);
     
         Log::info('البيانات المدخلة تم التحقق منها بنجاح', ['email' => $pendingDoctor->email]);
     
         // بدء المعاملة
-        return DB::transaction(function () use ($pendingDoctor, $validatedData) {
+        return DB::transaction(function () use ($pendingDoctor) {
             try {
                 // تسجيل اللوج قبل إنشاء الحساب
                 Log::info('بدء المعاملة: إنشاء حساب المستخدم للطبيب', [
                     'email'     => $pendingDoctor->email,  // استخدم البريد الإلكتروني للطبيب من جدول pending_doctors
-                    'password'  => $validatedData['password'], // سجل كلمة المرور المدخلة
+                    'password'  => 'تم استخدام كلمة السر من جدول pending_doctors', // نستخدم كلمة السر من جدول pending_doctors
                 ]);
-                
+    
                 // ✅ إنشاء حساب المستخدم للطبيب باستخدام البيانات الصحيحة
                 $user = User::create([
-                    'email'     => $pendingDoctor->email,  // هنا يتم استخدام البريد الإلكتروني للطبيب
-                    'password'  => Hash::make($validatedData['password']),
+                    'email'     => $pendingDoctor->email,
+                    'password'  => Hash::make($pendingDoctor->password),  // نستخدم كلمة السر من جدول pending_doctors
                     'user_type' => 'doctor',
                 ]);
     
-                // تسجيل اللوج بعد إنشاء الحساب
                 Log::info('تم إنشاء حساب المستخدم للطبيب', ['userId' => $user->user_id]);
     
                 Log::info('نقل الطبيب إلى جدول doctors');
@@ -151,11 +149,10 @@ class DoctorController extends Controller
                     'doctor_qualification' => $pendingDoctor->qualification,
                     'doctor_experience'    => $pendingDoctor->experience,
                     'doctor_bio'           => $pendingDoctor->bio,
-                   // 'doctor_license'  => $pendingDoctor->license_path,
                     'doctor_certificate' => $pendingDoctor->certificate_path,
                     'doctor_image'    => $pendingDoctor->image_path,
                     'doctor_phone'    => $pendingDoctor->phone,
-                    'user_id'       => $user->user_id,  // ربط الطبيب بحساب المستخدم
+                    'user_id'       => $user->user_id,
                 ]);
     
                 Log::info('تم نقل الطبيب إلى جدول doctors بنجاح', ['doctorId' => $doctor->doctor_id]);
@@ -205,7 +202,7 @@ class DoctorController extends Controller
         });
     }
     
-    
+           
  // ✅ جلب جميع الأطباء مع اسم التخصص
 public function index()
 {
