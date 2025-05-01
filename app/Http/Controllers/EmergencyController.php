@@ -153,10 +153,8 @@ class EmergencyController extends Controller
     ]);
 }
 
-
 public function acceptAmbulanceRequest($notificationId)
 {
-    // التحقق من أن الإشعار يخص هذا المستشفى فقط
     $notification = Notification::where('notification_id', $notificationId)
         ->where('user_id', auth()->id())
         ->first();
@@ -165,37 +163,32 @@ public function acceptAmbulanceRequest($notificationId)
         return response()->json(['message' => 'الإشعار غير موجود أو لا يخص هذا المستخدم.'], 404);
     }
 
-    // إذا كانت حالة الإشعار هي "ambulance-ignored"، يعني أن المريض تم إسعافه من قبل مستشفى آخر
     if ($notification->type === 'ambulance-ignored') {
         return response()->json(['message' => 'تم إسعاف المريض من قبل مستشفى آخر في نفس اليوم.'], 403);
     }
 
-    // تأكيد أن نوع الإشعار هو "ambulance"
     if ($notification->type !== 'ambulance') {
         return response()->json(['message' => 'الإشعار غير صحيح.'], 400);
     }
 
-    // التحقق من وجود المستشفى
     $hospital = Hospital::where('user_id', $notification->user_id)->first();
     if (!$hospital) {
         return response()->json(['message' => 'المستشفى غير موجود.'], 400);
     }
 
-    // التحقق من وجود المريض
-    $patient = Patient::find($notification->created_by);
+    // جلب المريض بناءً على user_id الموجود في created_by
+    $patient = Patient::where('user_id', $notification->created_by)->first();
     if (!$patient) {
         return response()->json(['message' => 'المريض غير موجود.'], 400);
     }
 
-    // التأكد من أن المستشفى له حساب مستخدم
     if (is_null($hospital->user_id)) {
         return response()->json(['message' => 'معرف المستشفى غير صحيح.'], 400);
     }
 
-    // التحقق إذا كان تم إسعاف المريض من قبل مستشفى آخر في نفس اليوم
-    $alreadyRescuedToday = AmbulanceRescue::where('patient_id', $notification->created_by)
-        ->whereDate('created_at', Carbon::today()) // التأكد أن الإسعاف في نفس اليوم
-        ->where('hospital_id', '!=', $hospital->hospital_id) // التأكد من أن الإسعاف كان من مستشفى آخر
+    $alreadyRescuedToday = AmbulanceRescue::where('patient_id', $patient->patient_id)
+        ->whereDate('created_at', Carbon::today())
+        ->where('hospital_id', '!=', $hospital->hospital_id)
         ->exists();
 
     if ($alreadyRescuedToday) {
@@ -214,13 +207,13 @@ public function acceptAmbulanceRequest($notificationId)
 
     // تخزين بيانات الإسعاف
     $ambulanceRescue = new AmbulanceRescue();
-    $ambulanceRescue->patient_id = $notification->created_by;
+    $ambulanceRescue->patient_id = $patient->patient_id; // 🔧 تم التعديل هنا
     $ambulanceRescue->hospital_id = $hospital->hospital_id;
     $ambulanceRescue->user_id = $notification->created_by;
     $ambulanceRescue->location_name = $locationName;
     $ambulanceRescue->save();
 
-    // إرسال إشعار للمريض
+    // إشعار للمريض
     $responseNotification = new Notification();
     $responseNotification->user_id = $notification->created_by;
     $responseNotification->created_by = $notification->user_id;
@@ -230,7 +223,6 @@ public function acceptAmbulanceRequest($notificationId)
     $responseNotification->is_read = 0;
     $responseNotification->save();
 
-    // تجاهل باقي الإشعارات التي تم إرسالها للمستشفيات التي تم تجاهل طلبها
     Notification::where('type', 'ambulance')
         ->where('created_by', $notification->created_by)
         ->where('notification_id', '!=', $notification->notification_id)
@@ -238,8 +230,6 @@ public function acceptAmbulanceRequest($notificationId)
 
     return response()->json(['message' => 'تم قبول طلب الإسعاف بنجاح'], 200);
 }
-
-
 
 
     public function showPatientMedicalRecord($ambulanceRescueId)

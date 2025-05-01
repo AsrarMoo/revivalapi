@@ -28,79 +28,89 @@ class DoctorController extends Controller
         Log::info('Request received to register doctor:', $request->all());
     
         $validatedData = $request->validate([
-            'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:pending_doctors,email',
-            'password'     => 'required|min:6',
-            'phone'        => 'required|string|max:15|unique:pending_doctors,phone',
-            'gender'       => 'required|in:ذكر,أنثى',
-            'specialty_name'=> 'required|string',  // اسم التخصص
-           // 'specialty_id' => 'required|integer|exists:specialties,specialty_id',
-            'qualification'=> 'required|string|max:255',
-            'experience'   => 'required|integer|min:0',
-            'bio'          => 'nullable|string',
-          //  'license'      => 'nullable|max:2048',
-            'certificate'  => 'nullable|file|max:2048',
-            'image'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'name'           => 'required|string|max:255',
+            'email'          => 'required|email|unique:pending_doctors,email',
+            'password'       => 'required|min:6',
+            'phone'          => 'required|string|max:15|unique:pending_doctors,phone',
+            'gender'         => 'required|in:ذكر,أنثى',
+            'specialty_name' => 'required|string', // اسم التخصص
+            'qualification'  => 'required|string|max:255',
+            'experience'     => 'required|integer|min:0',
+            'bio'            => 'nullable|string',
+            'certificate'    => 'nullable|file|max:5120',
+            'image'          => 'nullable|image|mimes:jpg,jpeg,png|max:5120',
         ]);
     
         return DB::transaction(function () use ($validatedData, $request) {
             try {
-                // ✅ تخزين الملفات
-         //       $licensePath = $request->file('license')->store('doctor_licenses', 'public');
-                $certificatePath = $request->hasFile('certificate') ? 
-                                   $request->file('certificate')->store('doctor_certificates', 'public') : null;
-                $imagePath = $request->hasFile('image') ? 
-                             $request->file('image')->store('doctor_images', 'public') : null;
-                             $specialty = Specialty::where('specialty_name', $validatedData['specialty_name'])->first();
-
-                             if (!$specialty) {
-                                
-                                 return response()->json([
-                                     'message' => 'التخصص غير موجود!',
-                                 ], 400);
-                             }
-                             $specialtyId = $specialty->specialty_id;
-                // ✅ إنشاء سجل في `pending_doctors`
+                // ✅ حفظ الشهادة بالامتداد الأصلي
+                $certificatePath = null;
+                if ($request->hasFile('certificate')) {
+                    $certificateFile = $request->file('certificate');
+                    $certificateExtension = $certificateFile->getClientOriginalExtension();
+                    $certificateName = uniqid() . '.' . $certificateExtension;
+                    $certificatePath = $certificateFile->storeAs('doctor_certificates', $certificateName, 'public');
+                }
+    
+                // ✅ حفظ الصورة بالامتداد الأصلي
+                $imagePath = null;
+                if ($request->hasFile('image')) {
+                    $imageFile = $request->file('image');
+                    $imageExtension = $imageFile->getClientOriginalExtension();
+                    $imageName = uniqid() . '.' . $imageExtension;
+                    $imagePath = $imageFile->storeAs('doctor_images', $imageName, 'public');
+                }
+    
+                // ✅ التحقق من وجود التخصص
+                $specialty = Specialty::where('specialty_name', $validatedData['specialty_name'])->first();
+                if (!$specialty) {
+                    return response()->json([
+                        'message' => 'التخصص غير موجود!',
+                    ], 400);
+                }
+    
+                // ✅ إنشاء سجل في جدول pending_doctors
                 $pendingDoctor = PendingDoctor::create([
-                    'name'     => $validatedData['name'],
+                    'name'            => $validatedData['name'],
                     'email'           => $validatedData['email'],
-                    'password'  => Hash::make($validatedData['password']),
+                    'password'        => Hash::make($validatedData['password']),
                     'phone'           => $validatedData['phone'],
                     'gender'          => $validatedData['gender'],
-                    'specialty_id'   => $specialty->specialty_id,
+                    'specialty_id'    => $specialty->specialty_id,
                     'qualification'   => $validatedData['qualification'],
                     'experience'      => $validatedData['experience'],
                     'bio'             => $validatedData['bio'] ?? null,
-                    //'license_path'    => $licensePath,
                     'certificate_path'=> $certificatePath,
                     'image_path'      => $imagePath,
                     'status'          => 'pending',
                 ]);
     
-                // ✅ إرسال إشعار إلى وزارة الصحة
+                // ✅ إرسال إشعار لوزارة الصحة
                 Notification::create([
-                    'user_id'    => 47, // ID وزارة الصحة
-                    'created_by' => $pendingDoctor->id,
-                    'type'       => 'Requesting',
-                    'title'      => 'طلب تسجيل طبيب جديد',
-                    'message'    => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']} (التخصص: {$specialty->specialty_name}).",  // إضافة اسم التخصص في الإشعار
-                    'is_read'    => 0,
-                    'pending_doctor_id' => $pendingDoctor->id, // إضافة معرف الطبيب المعلق
-                    'created_at' => now(),
+                    'user_id'           => 47, // ID وزارة الصحة
+                    'created_by'        => $pendingDoctor->id,
+                    'type'              => 'Requesting',
+                    'title'             => 'طلب تسجيل طبيب جديد',
+                    'message'           => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']} (التخصص: {$specialty->specialty_name}).",
+                    'is_read'           => 0,
+                    'pending_doctor_id' => $pendingDoctor->id,
+                    'created_at'        => now(),
                 ]);
     
                 return response()->json([
-                    'message' => 'تم إرسال طلبك إلى وزارة الصحة، سيتم إعلامك عند الموافقة.',
+                    'message'        => 'تم إرسال طلبك إلى وزارة الصحة، سيتم إعلامك عند الموافقة.',
                     'pending_doctor' => $pendingDoctor,
                 ], 201);
+    
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'حدث خطأ أثناء تسجيل الطبيب.',
-                    'error' => $e->getMessage()
+                    'error'   => $e->getMessage()
                 ], 500);
             }
         });
     }
+    
     public function approveDoctor(Request $request, $doctorId)
     {
         Log::info('البحث عن الطبيب في جدول pending_doctors', ['doctorId' => $doctorId]);
