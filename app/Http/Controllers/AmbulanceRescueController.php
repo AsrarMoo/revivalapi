@@ -20,22 +20,22 @@ class AmbulanceRescueController extends Controller
     {
         $hospital_id = Auth::user()->hospital_id;
         $rescuedPatients = AmbulanceRescue::where('hospital_id', $hospital_id)->get();
-
+    
         if ($rescuedPatients->isEmpty()) {
             return response()->json(['message' => 'لا يوجد مرضى تم إسعافهم من قبل هذه المستشفى.'], 404);
         }
-
+    
         $patientData = [];
-
+    
         foreach ($rescuedPatients as $rescue) {
             $patient = Patient::find($rescue->patient_id);
-
+    
             if ($patient) {
                 $medicalRecords = MedicalRecord::where('patient_id', $patient->patient_id)->get();
-
-                // إذا ما عنده ولا سجل طبي
+    
                 if ($medicalRecords->isEmpty()) {
                     $patientData[] = [
+                        'ambulance_rescue_id' => $rescue->id, // إضافة معرف الإسعاف هنا
                         'patient' => [
                             'patient_name' => $patient->patient_name,
                             'patient_age' => $patient->patient_age,
@@ -44,16 +44,15 @@ class AmbulanceRescueController extends Controller
                         ],
                         'message' => 'لا يوجد سجل طبي خاص بهذا المريض.'
                     ];
-                    continue; // ننتقل للمريض التالي
+                    continue;
                 }
-
+    
                 $formattedRecords = [];
-
+    
                 foreach ($medicalRecords as $record) {
                     $doctor = Doctor::find($record->doctor_id);
                     $hospital = Hospital::find($record->hospital_id);
-
-                    // الأدوية الخاصة بهذا السجل
+    
                     $recordMedications = RecordMedication::where('medical_record_id', $record->medical_record_id)->get();
                     $medications = [];
                     foreach ($recordMedications as $medication) {
@@ -62,8 +61,7 @@ class AmbulanceRescueController extends Controller
                             $medications[] = $name;
                         }
                     }
-
-                    // الفحوصات الخاصة بهذا السجل
+    
                     $recordTests = MedicalRecordTest::where('medical_record_id', $record->medical_record_id)->get();
                     $tests = [];
                     foreach ($recordTests as $test) {
@@ -75,7 +73,7 @@ class AmbulanceRescueController extends Controller
                             ];
                         }
                     }
-
+    
                     $formattedRecords[] = [
                         'medical_record_id' => $record->medical_record_id,
                         'patient_status' => $record->patient_status,
@@ -88,8 +86,9 @@ class AmbulanceRescueController extends Controller
                         'tests' => $tests,
                     ];
                 }
-
+    
                 $patientData[] = [
+                    'ambulance_rescue_id' => $rescue->id, // إضافة معرف الإسعاف هنا
                     'patient' => [
                         'patient_name' => $patient->patient_name,
                         'patient_age' => $patient->patient_age,
@@ -100,7 +99,7 @@ class AmbulanceRescueController extends Controller
                 ];
             }
         }
-
+    
         return response()->json(['rescued_patients' => $patientData]);
     }
 }
