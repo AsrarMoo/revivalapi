@@ -70,37 +70,55 @@ class NotificationController extends Controller
      */
     public function getUserNotifications()
     {
-        $userId = Auth::id();
-        
-        // استعلام للحصول على الإشعارات للمستخدم مع شرط عدم قراءة الإشعار
-        $notifications = Notification::where(function ($query) use ($userId) {
-            $query->where('user_id', $userId)
-                  ->orWhereNull('user_id');
-        })
-        ->where('is_read', '!=', 1)  // إضافة شرط لتجاهل الإشعارات المقروءة
-        ->orderBy('created_at', 'desc')
-        ->get();
-        
-        $notifications->transform(function ($notification) {
-            $creatorName = $this->getCreatorName($notification->created_by);
-        
-            return [
-                'notification_id' => $notification->notification_id,
-                'user_id' => $notification->user_id,
-                'created_by' => $creatorName, // استبدال المعرف بالاسم الصحيح
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'type' => $notification->type,
-                'is_read' => $notification->is_read,
-                'created_at' => $notification->created_at,
-            ];
-        });
-        
-        return response()->json([
-            'user_id' => $userId,
-            'count' => $notifications->count(),
-            'notifications' => $notifications,
-        ]);
+        try {
+            $userId = Auth::id();
+            \Log::info("📌 Authenticated User ID: $userId");
+    
+            if (!$userId) {
+                \Log::warning("🚫 لا يوجد مستخدم مسجل دخول");
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+    
+            $notifications = Notification::where(function ($query) use ($userId) {
+                    $query->where('user_id', $userId)
+                          ->orWhereNull('user_id');
+                })
+                ->where('is_read', '!=', 1)
+                ->orderBy('created_at', 'desc')
+                ->get();
+    
+            \Log::info("📥 عدد الإشعارات التي تم استرجاعها: " . $notifications->count());
+    
+            $notifications->transform(function ($notification) {
+                try {
+                    $creatorName = $this->getCreatorName($notification->created_by);
+                } catch (\Exception $e) {
+                    \Log::error("⚠️ خطأ في getCreatorName: " . $e->getMessage());
+                    $creatorName = "غير معروف";
+                }
+    
+                return [
+                    'notification_id' => $notification->notification_id,
+                    'user_id' => $notification->user_id,
+                    'created_by' => $creatorName,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'type' => $notification->type,
+                    'is_read' => $notification->is_read,
+                    'created_at' => $notification->created_at,
+                ];
+            });
+    
+            return response()->json([
+                'user_id' => $userId,
+                'count' => $notifications->count(),
+                'notifications' => $notifications,
+            ]);
+    
+        } catch (\Exception $e) {
+            \Log::error("❌ خطأ داخلي في getUserNotifications: " . $e->getMessage());
+            return response()->json(['message' => 'Server Error'], 500);
+        }
     }
     
     /**

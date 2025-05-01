@@ -388,6 +388,28 @@ public function getPatientAppointments()
         }),
     ], 200);
 }
+public function completeAppointment($appointmentId)
+{
+    // البحث عن الموعد باستخدام المعرف
+    $appointment = Appointment::find($appointmentId);
+
+    // التحقق إذا كان الموعد موجودًا
+    if (!$appointment) {
+        return response()->json(['error' => 'الموعد غير موجود.'], 404);
+    }
+
+    // التحقق من حالة الموعد إذا كانت "Confirmed"
+    if ($appointment->status !== 'Confirmed') {
+        return response()->json(['error' => 'لا يمكن إكمال الموعد إلا إذا كان في حالة "موافقة".'], 400);
+    }
+
+    // تحديث الحالة إلى "Completed"
+    $appointment->status = 'Completed';
+    $appointment->save();
+
+    return response()->json(['message' => 'تم تحويل الموعد إلى مكتمل بنجاح.']);
+
+}
 
 
 }

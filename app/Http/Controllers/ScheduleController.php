@@ -180,7 +180,7 @@ public function update(Request $request, $id)
                     ' من ' . $oldStartTime . ' - ' . $oldEndTime . 
                     ' إلى ' . $request->start_time . ' - ' . $request->end_time . 
                     '، يرجى الموافقة أو الرفض.',
-        'type' => 'booking',
+        'type' => 'editing',
         'is_read' => 0,
            'created_at' => Carbon::now(),
             

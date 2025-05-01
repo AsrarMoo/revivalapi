@@ -162,6 +162,8 @@ Route::prefix('appointments')->group(function () {
     Route::get('/doctor/record', [AppointmentController::class, 'getDoctorAppointments']);
     Route::delete('{appointmentId}/cancel', [AppointmentController::class, 'cancelAppointment']);
     Route::get('/patient', [AppointmentController::class, 'getPatientAppointments']);
+    Route::post('{id}/complete', [AppointmentController::class, 'completeAppointment']);
+
 
     Route::get('/doctor/{doctorId}/schedules', [ScheduleController::class, 'showDoctorSchedules']);
     
