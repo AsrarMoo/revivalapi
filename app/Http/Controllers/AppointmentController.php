@@ -97,14 +97,25 @@ class AppointmentController extends Controller
         $notification->message = "تم إضافة موعد جديد مع الطبيب " . $appointment->doctor->doctor_name . " في المستشفى " . $appointment->hospital->hospital_name . " ينتظر تأكيدك.";
         $notification->type = 'booking'; // نوع الإشعار (حجز)
         $notification->is_read = 0; // إشعار غير مقروء
+        $notification->request_id = $appointment->appointment_id;
         $notification->save();
     }
 
 
-
-    public function confirmAppointment($appointmentId)
+    public function confirmAppointment($notificationId)
     {
-        // البحث عن الموعد باستخدام المعرف
+        // البحث عن الإشعار باستخدام معرف الإشعار (notification_id)
+        $notification = Notification::find($notificationId);
+    
+        // التحقق إذا كان الإشعار موجودًا
+        if (!$notification) {
+            return response()->json(['error' => 'الإشعار غير موجود.'], 404);
+        }
+    
+        // الحصول على معرف الموعد من حقل request_id في الإشعار
+        $appointmentId = $notification->request_id;
+    
+        // البحث عن الموعد باستخدام معرف الموعد
         $appointment = Appointment::find($appointmentId);
     
         // التحقق إذا كان الموعد موجودًا
@@ -162,8 +173,7 @@ class AppointmentController extends Controller
         $notification->is_read = 0; // تعيين الإشعار كغير مقروء
         $notification->save();
     }
-
-
+    
     public function getHospitalAppointments(Request $request)
     {
         // الحصول على بيانات المستخدم

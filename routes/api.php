@@ -157,7 +157,7 @@ Route::prefix('appointments')->group(function () {
     //Route::get('/{id}', [AppointmentController::class, 'show']); // عرض تفاصيل حجز معين
     Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
     Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
-    Route::post('/confirm/{appointment_id}', [AppointmentController::class, 'confirmAppointment']);
+    Route::post('/confirm/{notificationId}', [AppointmentController::class, 'confirmAppointment']);
     Route::get('/hospital/record', [AppointmentController::class, 'getHospitalAppointments']);
     Route::get('/doctor/record', [AppointmentController::class, 'getDoctorAppointments']);
     Route::delete('{appointmentId}/cancel', [AppointmentController::class, 'cancelAppointment']);
