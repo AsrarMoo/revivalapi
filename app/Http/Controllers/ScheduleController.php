@@ -171,9 +171,8 @@ public function update(Request $request, $id)
         return response()->json(['error' => 'لم يتم العثور على المستخدم المسؤول عن المستشفى'], 500);
     }
 
-   
-    // 🔹 إرسال إشعار للمستشفى مع روابط القبول والرفض
-    DB::table('notifications')->insert([
+    // 🔹 إنشاء معرف الطلب (request_id) في جدول الإشعارات
+    $requestId = DB::table('notifications')->insertGetId([
         'user_id' => $hospitalUserId,
         'title' => 'طلب تعديل موعد',
         'message' => 'تم طلب تعديل موعد من قبل الطبيب ' . auth()->user()->name . 
@@ -182,52 +181,63 @@ public function update(Request $request, $id)
                     '، يرجى الموافقة أو الرفض.',
         'type' => 'editing',
         'is_read' => 0,
-           'created_at' => Carbon::now(),
-            
-        
+        'created_at' => Carbon::now(),
+    ]);
+
+    // تحديث الإشعار بإضافة معرف الطلب (request_id)
+    DB::table('notifications')->where('notification_id', $requestId)->update([
+       'request_id' => $schedule->schedule_id,
+
     ]);
 
     return response()->json(['message' => 'تم تحديث الموعد، في انتظار موافقة المستشفى']);
 }
+public function reviewSchedule($notificationId)
+{
+    // جلب الإشعار
+    $notification = DB::table('notifications')->where('notification_id', $notificationId)->first();
 
-
-    // 🔹 مراجعة الموعد من قبل المستشفى (قبول أو رفض)
-    public function reviewSchedule(Request $request, $id)
-    {
-        $request->validate([
-            'status' => 'required|in:approved,rejected',
-        ]);
-
-        $schedule = Schedule::where('schedule_id', $id)->firstOrFail();
-
-        if ($request->status === 'approved') {
-            // تحديث الجدول إذا تمت الموافقة
-            $schedule->update([
-                'start_time' => $schedule->proposed_start_time,
-                'end_time' => $schedule->proposed_end_time,
-                'status' => 'متاح', 
-                'proposed_start_time' => null,
-                'proposed_end_time' => null
-            ]);
-            $message = 'تمت الموافقة على تعديل الموعد وأصبح متاحًا.';
-        } else {
-            // فقط تحديث الحالة إذا تم الرفض
-            $schedule->update(['status' => 'rejected']);
-            $message = 'تم رفض تعديل الموعد.';
-        }
-
-        // 🔹 إرسال إشعار للطبيب
-        DB::table('notifications')->insert([
-            'user_id' => User::where('doctor_id', $schedule->doctor_id)->value('user_id'),
-            'title' => $request->status === 'approved' ? 'تمت الموافقة على التعديل' : 'تم رفض تعديل الموعد',
-            'message' => $message,
-            'type' => 'booking',
-            'is_read' => 0,
-            'created_at' => now()
-        ]);
-
-        return response()->json(['message' => $message]);
+    if (!$notification) {
+        return response()->json(['message' => 'الإشعار غير موجود'], 404);
     }
+
+    // جلب الموعد المرتبط
+    $schedule = Schedule::where('schedule_id', $notification->request_id)->first();
+
+    if (!$schedule) {
+        return response()->json(['message' => 'الموعد غير موجود'], 404);
+    }
+
+    // تعيين الحالة (مثلاً دائماً approval)
+    $status = 'approved'; // أو 'rejected' حسب ما تريد
+
+    if ($status === 'approved') {
+        $schedule->update([
+            'start_time' => $schedule->proposed_start_time,
+            'end_time' => $schedule->proposed_end_time,
+            'status' => 'متاح',
+            'proposed_start_time' => null,
+            'proposed_end_time' => null
+        ]);
+        $message = 'تمت الموافقة على تعديل الموعد وأصبح متاحًا.';
+    } else {
+        $schedule->update(['status' => 'rejected']);
+        $message = 'تم رفض تعديل الموعد.';
+    }
+
+    // إشعار للطبيب
+    DB::table('notifications')->insert([
+        'user_id' => User::where('doctor_id', $schedule->doctor_id)->value('user_id'),
+        'title' => $status === 'approved' ? 'تمت الموافقة على التعديل' : 'تم رفض تعديل الموعد',
+        'message' => $message,
+        'type' => 'booking',
+        'is_read' => 0,
+        'created_at' => now()
+    ]);
+
+    return response()->json(['message' => $message]);
+}
+
 
     // 🔹 حذف موعد
     public function destroy($id)

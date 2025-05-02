@@ -75,7 +75,8 @@ Route::middleware('auth:api')->group(function () {
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
         Route::put('{notification_id}/{action}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
-       
+        Route::get('/doctors', [HospitalDoctorRequestApprovalController::class, 'getHospitalDoctors']);
+
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
     });
     //✅ عرض اسماء المستشفيات والاطباء المتاحين 
@@ -147,7 +148,7 @@ Route::prefix('schedules')->group(function () {
     Route::get('/{id}', [ScheduleController::class, 'show']);//عرض تفاصيل موعد معين
     Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
     Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
-    Route::post('/review/{id}', [ScheduleController::class, 'reviewSchedule']);
+    Route::post('/review/{notificationId}', [ScheduleController::class, 'reviewSchedule']);
    
 });
 // ✅ إدارة الحجوزات

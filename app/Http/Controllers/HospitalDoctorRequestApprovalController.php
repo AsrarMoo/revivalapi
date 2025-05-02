@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\HospitalDoctorRequest;
 use App\Models\Notification;
 use App\Models\HospitalDoctor;
+use App\Models\Doctor;
+
+use App\Models\Hospital;
+
 
 class HospitalDoctorRequestApprovalController extends Controller
 {
@@ -125,4 +129,33 @@ $notification->save();
 
         return response()->json($pendingRequests, 200);
     }
+    public function getHospitalDoctors()
+{
+    $user = Auth::user();
+
+    // تحقق أن المستخدم مستشفى
+    if (!$user || $user->user_type !== 'hospital') {
+        return response()->json(['error' => 'غير مصرح لك بالوصول لهذه البيانات.'], 403);
+    }
+
+    // جلب hospital_id للمستشفى المرتبط بالمستخدم
+    $hospitalId = $user->hospital_id;
+
+    if (!$hospitalId) {
+        return response()->json(['error' => 'لم يتم العثور على مستشفى مرتبط بهذا المستخدم.'], 404);
+    }
+
+    // جلب الأطباء الذين يعملون في هذا المستشفى
+    $doctors = Doctor::whereIn('doctor_id', function ($query) use ($hospitalId) {
+        $query->select('doctor_id')
+              ->from('hospital_doctors')
+              ->where('hospital_id', $hospitalId);
+    })->select('doctor_id', 'doctor_name')->get();
+
+    if ($doctors->isEmpty()) {
+        return response()->json(['message' => 'لا يوجد أطباء مرتبطين بهذا المستشفى.'], 200);
+    }
+
+    return response()->json(['doctors' => $doctors], 200);
+}
 }
