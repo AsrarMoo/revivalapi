@@ -481,5 +481,44 @@ public function acceptAmbulanceRequest($notificationId)
     
         return response()->json(['message' => 'تم قبول طلب الإسعاف بنجاح'], 200);
     }
+    public function markFakeAmbulanceRequest($id)
+    {
+        $rescueRequest = AmbulanceRescue::find($id);
     
-}    
+        if (!$rescueRequest) {
+            return response()->json(['message' => 'Ambulance rescue request not found'], 404);
+        }
+    
+        if ($rescueRequest->status !== 'مكتمل') {
+            return response()->json(['message' => 'Request is not in a valid state to be marked fake'], 400);
+        }
+    
+        // تغيير حالة الطلب إلى "كاذب"
+        $rescueRequest->status = 'كاذب';
+        $rescueRequest->save();
+    
+        // حظر المستخدم إذا موجود
+        if ($rescueRequest->user_id) {
+            $user = User::find($rescueRequest->user_id);
+            if ($user) {
+                $user->is_banned = true;
+                $user->save();
+        // إرسال نفس الإشعار للمريض اللي عمل الطلب
+        $patientUser = User::where('patient_id', $rescueRequest->patient_id)->first();
+        if ($patientUser) {
+            $patientNotification = new Notification();
+            $patientNotification->user_id = $patientUser->user_id;
+            $patientNotification->created_by = auth()->id(); // أو $hospitalUserId إذا عندك
+            $patientNotification->title = '🚨 تم حظرك من طلب الإسعاف';
+            $patientNotification->message = 'تم حظرك من إرسال طلبات الإسعاف بسبب بلاغ من المستشفى بأن الطلب كان وهميًا.';
+            $patientNotification->type = 'rejected';
+            $patientNotification->is_read = 0;
+            $patientNotification->save();
+        }
+    
+        return response()->json(['message' => 'تم حظر المستخدم بنجاح بسبب طلب إسعاف وهمي.']);
+    }
+    
+        }
+    }}
+    
