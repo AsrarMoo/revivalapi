@@ -12,7 +12,7 @@ class Notification extends Model
 
     protected $table = 'notifications';
 
-    protected $fillable = ['user_id','created_by', 'title', 'message', 'type', 'is_read', 'created_at'];
+    protected $fillable = ['user_id','created_by','request_id', 'title', 'message', 'type', 'is_read', 'created_at'];
 
     public $timestamps = false; // 🚀 يمنع Laravel من إضافة `updated_at`
    

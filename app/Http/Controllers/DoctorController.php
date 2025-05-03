@@ -92,7 +92,7 @@ class DoctorController extends Controller
                 // ✅ إرسال إشعار لوزارة الصحة
                 Notification::create([
                     'user_id'           => 47, // ID وزارة الصحة
-                    'created_by'        => $pendingDoctor->id,
+                  'request_id' => $pendingDoctor->id,
                     'type'              => 'Requesting',
                     'title'             => 'طلب تسجيل طبيب جديد',
                     'message'           => "تم تقديم طلب تسجيل طبيب جديد: {$validatedData['name']} (التخصص: {$specialty->specialty_name}).",
@@ -116,19 +116,16 @@ class DoctorController extends Controller
     }
     public function approveDoctor($notificationId)
     {
-        // 1. البحث عن الإشعار باستخدام notificationId
         $notification = Notification::find($notificationId);
     
         if (!$notification) {
             return response()->json(['message' => 'الإشعار غير موجود'], 404);
         }
     
-        // 2. أخذ معرف منشئ الإشعار (created_by)
         $createdBy = $notification->created_by;
     
         Log::info('البحث عن الطبيب في جدول pending_doctors حسب created_by', ['created_by' => $createdBy]);
     
-        // 3. إيجاد الطبيب حسب created_by في جدول pending_doctors
         $pendingDoctor = PendingDoctor::where('created_by', $createdBy)->first();
     
         if (!$pendingDoctor) {
@@ -136,7 +133,6 @@ class DoctorController extends Controller
             return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار.'], 404);
         }
     
-        // 4. تنفيذ عملية الموافقة داخل معاملة (transaction)
         return DB::transaction(function () use ($pendingDoctor, $notification) {
             try {
                 $user = User::create([
@@ -159,19 +155,18 @@ class DoctorController extends Controller
     
                 $user->update(['doctor_id' => $doctor->doctor_id]);
     
+                // ✅ تمرير request_id من الإشعار الأصلي
                 DB::table('notifications')->insert([
                     'user_id'    => $user->user_id,
-                    'title'     => 'approval',
-                    'type'      => 'approval',
-                    'message'   => "تمت الموافقة على طلب تسجيلك كطبيب.",
-                    'is_read'   => 0,
-                    'created_at'=> now(),
+                    'request_id' => $notification->request_id, // <-- هنا الإضافة المهمة
+                    'title'      => 'approval',
+                    'type'       => 'approval',
+                    'message'    => "تمت الموافقة على طلب تسجيلك كطبيب.",
+                    'is_read'    => 0,
+                    'created_at' => now(),
                 ]);
     
-                // حذف الإشعار الأصلي بعد الموافقة (اختياري)
                 $notification->delete();
-    
-                // حذف الطبيب من قائمة الانتظار
                 $pendingDoctor->delete();
     
                 return response()->json([
@@ -188,35 +183,78 @@ class DoctorController extends Controller
             }
         });
     }
-    
-     
+
+
     public function rejectDoctor($notificationId)
+{
+    // 1. البحث عن الإشعار باستخدام notificationId
+    $notification = Notification::find($notificationId);
+
+    if (!$notification) {
+        return response()->json(['message' => 'الإشعار غير موجود'], 404);
+    }
+
+    // 2. أخذ معرف منشئ الإشعار (created_by)
+    $createdBy = $notification->created_by;
+
+    Log::info('البحث عن الطبيب في جدول pending_doctors حسب created_by', ['created_by' => $createdBy]);
+
+    // 3. إيجاد الطبيب حسب created_by في جدول pending_doctors
+    $pendingDoctor = PendingDoctor::where('created_by', $createdBy)->first();
+
+    if (!$pendingDoctor) {
+        Log::warning('الطبيب غير موجود في قائمة الانتظار', ['created_by' => $createdBy]);
+        return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار.'], 404);
+    }
+
+    // 4. تنفيذ عملية الرفض داخل معاملة (transaction)
+    return DB::transaction(function () use ($pendingDoctor, $notification) {
+        try {
+            // حذف الإشعار الأصلي بعد الرفض
+            $notification->delete();
+
+            // حذف الطبيب من قائمة الانتظار
+            $pendingDoctor->delete();
+
+            return response()->json([
+                'title'   => 'reject',
+                'message' => 'تم رفض الطبيب بنجاح!',
+                'type'    => 'rejection',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('خطأ أثناء الرفض', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'حدث خطأ أثناء المعالجة: ' . $e->getMessage()], 500);
+        }
+    });
+}
+
+      public function rejectDoctorByCreator($createdBy)
     {
-        // 1. البحث عن الإشعار باستخدام notificationId
-        $notification = Notification::find($notificationId);
+        // 1. البحث عن الإشعار المرتبط بهذا created_by
+        $notification = Notification::where('created_by', $createdBy)->first();
     
         if (!$notification) {
             return response()->json(['message' => 'الإشعار غير موجود'], 404);
         }
     
-        // 2. أخذ معرف منشئ الإشعار (created_by)
-        $createdBy = $notification->created_by;
-    
-        // 3. البحث عن الطبيب في جدول pending_doctors باستخدام created_by
+        // 2. البحث عن الطبيب في جدول pending_doctors باستخدام created_by
         $pendingDoctor = PendingDoctor::where('created_by', $createdBy)->first();
     
         if (!$pendingDoctor) {
             return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار'], 404);
         }
     
-        // 4. حذف الطبيب من جدول pending_doctors (رفض الطلب)
+        // 3. حذف الطبيب من جدول pending_doctors
         $pendingDoctor->delete();
     
-        // 5. حذف الإشعار إذا أردت (اختياري)
+        // 4. حذف الإشعار (اختياري)
         // $notification->delete();
     
         return response()->json(['message' => 'تم رفض طلب الطبيب بنجاح']);
     }
+    
  // ✅ جلب جميع الأطباء مع اسم التخصص
 public function index()
 {

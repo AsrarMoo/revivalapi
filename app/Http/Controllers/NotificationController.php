@@ -101,6 +101,7 @@ class NotificationController extends Controller
                     'notification_id' => $notification->notification_id,
                     'user_id' => $notification->user_id,
                     'created_by' => $creatorName,
+                    'request_id' => $notification->request_id,
                     'title' => $notification->title,
                     'message' => $notification->message,
                     'type' => $notification->type,
@@ -160,10 +161,6 @@ class NotificationController extends Controller
     
         return 'مستخدم (غير معروف)';
     }
-   
-    /**
-     * 🌍 2️⃣ جلب جميع الإشعارات في النظام (للمستشفيات ووزارة الصحة فقط)
-     */
    
    
     /**
