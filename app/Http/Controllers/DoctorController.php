@@ -30,7 +30,7 @@ class DoctorController extends Controller
         $validatedData = $request->validate([
             'name'           => 'required|string|max:255',
             'email'          => 'required|email|unique:pending_doctors,email',
-            'password'       => 'required|min:6',
+            'password'       => 'required|min:8|regex:/[A-Z]/|regex:/[0-9]/|regex:/[@$!%*?&]/', // القيود الخاصة بكلمة المرور
             'phone'          => 'required|string|max:15|unique:pending_doctors,phone',
             'gender'         => 'required|in:ذكر,أنثى',
             'specialty_name' => 'required|string', // اسم التخصص
@@ -39,6 +39,10 @@ class DoctorController extends Controller
             'bio'            => 'nullable|string',
             'certificate'    => 'nullable|file|max:5120',
             'image'          => 'nullable|image|mimes:jpg,jpeg,png|max:5120',
+        ], [
+            'password.required' => 'كلمة المرور مطلوبة.',
+            'password.min' => 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.',
+            'password.regex' => 'يجب أن تحتوي كلمة المرور على حرف كبير، رقم، ورمز خاص مثل @$!%*?&.',
         ]);
     
         return DB::transaction(function () use ($validatedData, $request) {
@@ -110,6 +114,7 @@ class DoctorController extends Controller
             }
         });
     }
+    
     
     public function approveDoctor(Request $request, $doctorId)
     {
