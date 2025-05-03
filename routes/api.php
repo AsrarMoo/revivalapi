@@ -43,6 +43,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
         Route::put('/approve-doctor/{createdBy}', [DoctorController::class, 'approveDoctor']);
+        Route::put('/reject-doctor/{createdBy}', [DoctorController::class, 'rejectDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
         Route::get('/{id}', [DoctorController::class, 'showById']);
@@ -75,6 +76,7 @@ Route::middleware('auth:api')->group(function () {
     // ✅ إدارة الموافقات من وزارة الصحة
     Route::prefix('hospital-approvals')->group(function () {
         Route::put('{notification_id}/{action}', [HospitalDoctorRequestApprovalController::class, 'updateDoctorRequestStatus']); // قبول طلب المستشفى
+        Route::put('{notification_id}/reject', [HospitalDoctorRequestApprovalController::class, 'rejectDoctorRequest']); // رفض طلب المستشفى
         Route::get('/doctors', [HospitalDoctorRequestApprovalController::class, 'getHospitalDoctors']);
 
         Route::get('/pending', [HospitalDoctorRequestApprovalController::class, 'pendingRequests']); // مشاهدة جميع الطلبات المعتمدة أو المرفوضة
@@ -148,7 +150,8 @@ Route::prefix('schedules')->group(function () {
     Route::get('/{id}', [ScheduleController::class, 'show']);//عرض تفاصيل موعد معين
     Route::put('/{id}', [ScheduleController::class, 'update']); // تعديل موعد وإرسال إشعار للمستشفى
     Route::delete('/{id}', [ScheduleController::class, 'destroy']); // حذف موعد
-    Route::post('/review/{notificationId}', [ScheduleController::class, 'reviewSchedule']);
+    Route::post('/review/{notificationId}', [ScheduleController::class, 'reviewSchedule']);//قبول تعديل  موعد
+    Route::post('/rejectedreview/{notificationId}', [ScheduleController::class, 'rejectScheduleEdit']);//رفض اعديل موعد
    
 });
 // ✅ إدارة الحجوزات
@@ -159,6 +162,8 @@ Route::prefix('appointments')->group(function () {
     Route::put('/{id}', [AppointmentController::class, 'update']); // تعديل الحجز (مثل تغيير الحالة)
     Route::delete('/{id}', [AppointmentController::class, 'destroy']); // حذف الحجز
     Route::post('/confirm/{notificationId}', [AppointmentController::class, 'confirmAppointment']);
+    Route::post('/reject/{notificationId}', [AppointmentController::class, 'rejectAppointment']);
+    
     Route::get('/hospital/record', [AppointmentController::class, 'getHospitalAppointments']);
     Route::get('/doctor/record', [AppointmentController::class, 'getDoctorAppointments']);
     Route::delete('{appointmentId}/cancel', [AppointmentController::class, 'cancelAppointment']);
@@ -235,6 +240,7 @@ Route::prefix('ambulance-request')->group(function() {
     Route::post('find-nearest-hospitals', [EmergencyController::class, 'findNearestHospitals']);
     // قبول طلب الإسعاف
     Route::post('{notificationId}/accept', [EmergencyController::class, 'acceptAmbulanceRequest']);
+
     
     // رفض طلب الإسعاف
     Route::post('{notificationId}/reject', [EmergencyController::class, 'rejectAmbulanceRequest']);

@@ -211,8 +211,48 @@ class DoctorController extends Controller
             }
         });
     }
+    public function rejectDoctor(Request $request, $doctorId)
+    {
+        Log::info('البحث عن الطبيب في جدول pending_doctors للرفض', ['doctorId' => $doctorId]);
     
-           
+        // إيجاد الطبيب في جدول pending_doctors
+        $pendingDoctor = PendingDoctor::find($doctorId);
+    
+        if (!$pendingDoctor) {
+            Log::warning('الطبيب غير موجود في قائمة الانتظار للرفض', ['doctorId' => $doctorId]);
+            return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار.'], 404);
+        }
+    
+        return DB::transaction(function () use ($pendingDoctor) {
+            try {
+                Log::info('تم العثور على الطبيب، البدء في إجراءات الرفض', [
+                    'name' => $pendingDoctor->name,
+                    'email' => $pendingDoctor->email,
+                ]);
+    
+                // ❌ لا ترسل إشعار – تم حذفه
+    
+                // حذف الطبيب من جدول pending_doctors
+                $pendingDoctor->delete();
+    
+                Log::info('تم حذف الطبيب من جدول pending_doctors بعد الرفض', ['doctorId' => $pendingDoctor->id]);
+    
+                return response()->json([
+                    'title' => 'rejection',
+                    'message' => 'تم رفض الطبيب وحذفه من قائمة الانتظار بنجاح.',
+                    'type' => 'Rejected'
+                ], 200);
+    
+            } catch (\Exception $e) {
+                Log::error('حدث خطأ أثناء رفض الطبيب', ['error' => $e->getMessage()]);
+                DB::rollBack();
+                return response()->json(['message' => 'حدث خطأ أثناء رفض الطبيب: ' . $e->getMessage()], 500);
+            }
+        });
+    }
+    
+
+
  // ✅ جلب جميع الأطباء مع اسم التخصص
 public function index()
 {

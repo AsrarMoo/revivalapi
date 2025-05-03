@@ -40,7 +40,7 @@ class HospitalDoctorRequestApprovalController extends Controller
         }
 
         // تأكد من أن الحالة "معلق" قبل التحديث
-        if ($doctorRequest->status !== 'معلق') {
+        if ($doctorRequest->status !== 'pending') {
             return response()->json(['error' => 'تمت معالجة هذا الطلب بالفعل.'], 400);
         }
 
@@ -50,7 +50,7 @@ class HospitalDoctorRequestApprovalController extends Controller
         }
 
         // تحديد الحالة بناءً على نوع العملية
-        $status = ($action === 'accept') ? 'مقبول' : 'مرفوض';
+        $status = ($action === 'accept') ? 'accept' : 'rejected';
 
         // تحديث حالة الطلب
         $doctorRequest->status = $status;
@@ -60,7 +60,7 @@ $notification->is_read = 1;
 $notification->save();
 
         // إذا كانت الحالة مقبولة، نقوم بإضافة الطبيب إلى المستشفى في جدول hospital_doctors
-        if ($status === 'مقبول') {
+        if ($status === 'accept') {
             // التأكد من عدم وجود الطبيب في المستشفى بالفعل
             $existingDoctor = HospitalDoctor::where('hospital_id', $doctorRequest->hospital_id)
                 ->where('doctor_id', $doctorRequest->doctor_id)
@@ -77,7 +77,7 @@ $notification->save();
         }
 
         // تحديد الرسالة المناسبة
-        $message = ($status === 'مقبول') ? 'تمت الموافقة على طلب إضافة الطبيب بنجاح.' : 'تم رفض طلب إضافة الطبيب.';
+        $message = ($status === 'accept') ? 'تمت الموافقة على طلب إضافة الطبيب بنجاح.' : 'تم رفض طلب إضافة الطبيب.';
 
         try {
             // جلب المعرف الخاص بالمستشفى والطبيب
@@ -114,12 +114,86 @@ $notification->save();
             'status' => $doctorRequest->status
         ], 200);
     }
+//رفض الطلب من قبل الوزارة 
+public function rejectDoctorRequest($notification_id)
+{
+    \Log::info("رفض طلب إضافة طبيب بناءً على الإشعار: $notification_id");
+
+    // جلب الإشعار
+    $notification = Notification::find($notification_id);
+
+    if (!$notification) {
+        return response()->json(['error' => 'الإشعار غير موجود.'], 404);
+    }
+
+    // جلب الطلب
+    $doctorRequest = HospitalDoctorRequest::where('request_id', $notification->request_id)->first();
+
+    if (!$doctorRequest) {
+        return response()->json(['error' => 'الطلب غير موجود.'], 404);
+    }
+
+    // التأكد من صلاحية المستخدم
+    $user = Auth::user();
+    if (!$user || $user->user_type !== 'healthMinistry') {
+        return response()->json(['error' => 'غير مصرح لك برفض الطلبات.'], 403);
+    }
+
+    // التأكد من أن الطلب لم يُعالج مسبقًا
+    if ($doctorRequest->status !== 'pending') {
+        return response()->json(['error' => 'تمت معالجة هذا الطلب مسبقًا.'], 400);
+    }
+
+    // تحديث حالة الطلب إلى "مرفوض"
+    $doctorRequest->status = 'rejected';
+    $doctorRequest->save();
+
+    // جعل الإشعار كمقرؤ
+    $notification->is_read = 1;
+    $notification->save();
+
+    // الرسالة التي ستُرسل
+    $message = 'تم رفض طلب إضافة الطبيب من قبل وزارة الصحة.';
+
+    // إرسال إشعارات إلى المستشفى والطبيب
+    try {
+        $hospitalUserId = $doctorRequest->hospital->user_id ?? null;
+        $doctorUserId = $doctorRequest->doctor->user_id ?? null;
+
+        if ($hospitalUserId) {
+            Notification::create([
+                'user_id' => $hospitalUserId,
+                'created_by' => $user->user_id,
+                'title' => 'رفض طلب إضافة طبيب',
+                'message' => $message,
+                'type' => 'general',
+            ]);
+        }
+
+        if ($doctorUserId) {
+            Notification::create([
+                'user_id' => $doctorUserId,
+                'created_by' => $user->user_id,
+                'title' => 'رفض طلب إضافة طبيب',
+                'message' => $message,
+                'type' => 'general',
+            ]);
+        }
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'حدث خطأ أثناء إرسال الإشعارات.', 'details' => $e->getMessage()], 500);
+    }
+
+    return response()->json([
+        'message' => 'تم رفض الطلب بنجاح.',
+        'status' => $doctorRequest->status
+    ], 200);
+}
 
     // جلب جميع الطلبات المعلقة مع تفاصيل الطبيب
     public function pendingRequests()
     {
         // جلب جميع الطلبات المعلقة مع تفاصيل الطبيب والمستشفى
-        $pendingRequests = HospitalDoctorRequest::where('status', 'معلق')
+        $pendingRequests = HospitalDoctorRequest::where('status', 'pending')
             ->with(['hospital', 'doctor']) // إحضار المستشفى والطبيب المرتبطين بالطلب
             ->get();
 

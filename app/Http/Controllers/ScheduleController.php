@@ -238,6 +238,42 @@ public function reviewSchedule($notificationId)
     return response()->json(['message' => $message]);
 }
 
+//رفض تعديل الموعد 
+public function rejectScheduleEdit($notificationId)
+{
+    // جلب الإشعار
+    $notification = DB::table('notifications')->where('notification_id', $notificationId)->first();
+
+    if (!$notification) {
+        return response()->json(['message' => 'الإشعار غير موجود'], 404);
+    }
+
+    // جلب الموعد المرتبط
+    $schedule = Schedule::where('schedule_id', $notification->request_id)->first();
+
+    if (!$schedule) {
+        return response()->json(['message' => 'الموعد غير موجود'], 404);
+    }
+
+    // تحديث حالة الموعد إلى "مرفوض" وإزالة الأوقات المقترحة
+    $schedule->update([
+        'proposed_start_time' => null,
+        'proposed_end_time' => null,
+        'status' => 'متاح'
+    ]);
+
+    // إشعار للطبيب برفض التعديل
+    DB::table('notifications')->insert([
+        'user_id' => User::where('doctor_id', $schedule->doctor_id)->value('user_id'),
+        'title' => 'تم رفض تعديل الموعد',
+        'message' => 'تم رفض التعديل المقترح للموعد من قبل المستشفى.',
+        'type' => 'editing',
+        'is_read' => 0,
+        'created_at' => now()
+    ]);
+
+    return response()->json(['message' => 'تم رفض تعديل الموعد بنجاح.']);
+}
 
     // 🔹 حذف موعد
     public function destroy($id)

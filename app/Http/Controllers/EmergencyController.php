@@ -232,6 +232,29 @@ public function acceptAmbulanceRequest($notificationId)
 }
 
 
+
+//رفض طلب الاسعاف 
+public function rejectAmbulanceRequest($notificationId)
+{
+    $notification = Notification::where('notification_id', $notificationId)
+        ->where('user_id', auth()->id()) // تأكد أن الإشعار يخص المستشفى الحالي
+        ->first();
+
+    if (!$notification) {
+        return response()->json(['message' => 'الإشعار غير موجود أو لا يخص هذا المستخدم.'], 404);
+    }
+
+    if ($notification->type !== 'ambulance') {
+        return response()->json(['message' => 'الإشعار ليس من نوع طلب إسعاف.'], 400);
+    }
+
+    // تحديث نوع الإشعار إلى "مرفوض"
+    $notification->update(['type' => 'rejected']);
+
+    return response()->json(['message' => 'تم رفض طلب الإسعاف بنجاح.'], 200);
+}
+
+
     public function showPatientMedicalRecord($ambulanceRescueId)
     {
         // الحصول على سجل الإسعاف

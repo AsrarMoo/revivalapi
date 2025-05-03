@@ -158,6 +158,7 @@ class AppointmentController extends Controller
         $notification->is_read = 0; // تعيين الإشعار كغير مقروء
         $notification->save();
     }
+
     
     private function sendNotificationToDoctor($appointment)
     {
@@ -174,6 +175,61 @@ class AppointmentController extends Controller
         $notification->save();
     }
     
+    //رفض حجز 
+    public function rejectAppointment($notificationId)
+    {
+        // البحث عن الإشعار باستخدام معرف الإشعار
+        $notification = Notification::find($notificationId);
+    
+        // التحقق إذا كان الإشعار موجودًا
+        if (!$notification) {
+            return response()->json(['error' => 'الإشعار غير موجود.'], 404);
+        }
+    
+        // الحصول على معرف الموعد من حقل request_id
+        $appointmentId = $notification->request_id;
+    
+        // البحث عن الموعد
+        $appointment = Appointment::find($appointmentId);
+    
+        // التحقق إذا كان الموعد موجودًا
+        if (!$appointment) {
+            return response()->json(['error' => 'الموعد غير موجود.'], 404);
+        }
+    
+        // التحقق من حالة الموعد إذا كان في حالة "Pending"
+        if ($appointment->status !== 'Pending') {
+            return response()->json(['error' => 'الموعد لا يمكن رفضه لأنه ليس في حالة "Pending".'], 400);
+        }
+    
+        // تحديث حالة الموعد إلى "Rejected"
+        $appointment->status = 'Rejected';
+        $appointment->save();
+    
+        // إرسال إشعار للمريض فقط
+        $this->sendRejectionNotificationToPatient($appointment);
+    
+        return response()->json(['message' => 'تم رفض الموعد بنجاح.']);
+    }
+    private function sendRejectionNotificationToPatient($appointment)
+{
+    // الحصول على المريض باستخدام patient_id
+    $patient = Patient::find($appointment->patient_id);
+
+    if (!$patient) return; // إذا لم يكن هناك مريض مرتبط بالموعد
+
+    // إنشاء إشعار للمريض
+    $notification = new Notification();
+    $notification->user_id = $patient->user_id;  // تحديد المستخدم (المريض)
+    $notification->created_by = auth()->user()->id ?? $appointment->hospital->user_id;  // من قام بإنشاء الإشعار
+    $notification->title = 'تم رفض حجزك';
+    $notification->message = 'نأسف، تم رفض طلب حجزك مع الدكتور ' . $appointment->doctor->doctor_name . 
+                            ' في مستشفى ' . $appointment->hospital->hospital_name . '. يمكنك إعادة المحاولة لاحقاً.';
+    $notification->type = 'booking';  // نوع الإشعار
+    $notification->is_read = 0; // تعيين الإشعار كغير مقروء
+    $notification->save();
+}
+
     public function getHospitalAppointments(Request $request)
     {
         // الحصول على بيانات المستخدم
