@@ -42,8 +42,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/profile', [DoctorController::class, 'show']);
         Route::post('/{id}', [DoctorController::class, 'update']);
         Route::delete('/{id}', [DoctorController::class, 'destroy']);
-        Route::put('/approve-doctor/{createdBy}', [DoctorController::class, 'approveDoctor']);
-        Route::put('/reject-doctor/{createdBy}', [DoctorController::class, 'rejectDoctor']);
+        Route::put('/approve-doctor/{request_id}', [DoctorController::class, 'approveDoctor']);
+        Route::put('/reject-doctor/{request_id}', [DoctorController::class, 'rejectDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
         Route::get('/{id}', [DoctorController::class, 'showById']);
