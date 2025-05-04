@@ -20,7 +20,7 @@ class DoctorRatingController extends Controller
         // التحقق من وجود الحجز
         $appointment = Appointment::where('doctor_id', $doctor_id)
                                    ->where('patient_id', $patient->user_id)
-                                   ->whereIn('status', ['Confirmed', 'Completed']) // التأكد من أن الحالة "مؤكد" أو "مكتمل"
+                                   ->whereIn('status', [ 'Completed']) // التأكد من أن الحالة "مؤكد" أو "مكتمل"
                                    ->first();
     
         if (!$appointment) {
