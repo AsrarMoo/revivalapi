@@ -14,39 +14,28 @@ class DoctorRatingController extends Controller
 {
     public function rateDoctor(Request $request, $doctor_id)
     {
-        $user = Auth::user();
-    
-        // تحقق أن المستخدم الحالي مسجل دخوله ومريض
-        if (!$user || $user->user_type !== 'patient') {
-            return response()->json(['error' => 'فقط المرضى يمكنهم تقييم الأطباء.'], 403);
-        }
-    
-        // احصل على patient_id المرتبط بالمستخدم
-        $patient = Patient::where('user_id', $user->user_id)->first();
-    
-        if (!$patient) {
-            return response()->json(['error' => 'لم يتم العثور على حساب المريض المرتبط بهذا المستخدم.'], 404);
-        }
-    
-        // التحقق من وجود الحجز المكتمل
+        // التحقق من تسجيل الدخول
+        $patient = Auth::user();
+        
+        // التحقق من وجود الحجز
         $appointment = Appointment::where('doctor_id', $doctor_id)
-                                  ->where('patient_id', $patient->patient_id)
-                                  ->whereIn('status', ['Completed', 'completed', 'مكتمل']) // دعم حالات مختلفة
-                                  ->first();
+                                   ->where('patient_id', $patient->user_id)
+                                   ->whereIn('status', ['Confirmed', 'Completed']) // التأكد من أن الحالة "مؤكد" أو "مكتمل"
+                                   ->first();
     
         if (!$appointment) {
-            return response()->json(['error' => 'لم يتم العثور على حجز مكتمل مع هذا الطبيب.'], 404);
+            return response()->json(['error' => 'لم تجد حجزًا مع الطبيب هذا.'], 404);
         }
-    
-        // التحقق من وجود الموعد المرتبط
-        $schedule = $appointment->schedule;
-    
+
+        // جلب معلومات الموعد من جدول المواعيد المرتبط
+        $schedule = $appointment->schedule;  // Assuming the relationship is defined in Appointment model
+        
         if (!$schedule) {
-            return response()->json(['error' => 'لم يتم العثور على بيانات الموعد المرتبط بالحجز.'], 404);
+            return response()->json(['error' => 'لم يتم العثور على الموعد المرتبط بهذا الحجز.'], 404);
         }
-    
-        // تحقق من أن التقييم خلال 24 ساعة بعد الموعد
-        $appointmentTime = Carbon::parse($schedule->start_time);
+        
+        // استخدم وقت بداية الموعد (start_time) من جدول المواعيد
+        $appointmentTime = Carbon::parse($schedule->start_time); // تأكد من أن "start_time" هو اسم العمود في جدول المواعيد
         $timeDifference = now()->diffInHours($appointmentTime);
     
         if ($timeDifference > 24) {
@@ -54,16 +43,17 @@ class DoctorRatingController extends Controller
         }
     
         // التحقق من أن المريض لم يقيم من قبل
-        $ratingExists = DoctorRating::where('appointment_id', $appointment->appointment_id)->exists();
+        $ratingExists = DoctorRating::where('appointment_id', $appointment->appointment_id)
+                                    ->exists();
     
         if ($ratingExists) {
             return response()->json(['error' => 'لقد قمت بتقييم هذا الطبيب من قبل.'], 400);
         }
     
-        // إنشاء التقييم
-        DoctorRating::create([
+        // إنشاء التقييم الجديد
+        $rating = DoctorRating::create([
             'appointment_id' => $appointment->appointment_id,
-            'patient_id' => $patient->patient_id,
+            'patient_id' => $patient->user_id,
             'doctor_id' => $doctor_id,
             'professionalism' => $request->professionalism,
             'communication' => $request->communication,
@@ -71,20 +61,19 @@ class DoctorRatingController extends Controller
             'knowledge_experience' => $request->knowledge_experience,
             'punctuality' => $request->punctuality,
         ]);
-    
-        // إرسال إشعار للطبيب
-        Notification::create([
-            'user_id' => $doctor_id,
-            'created_by' => $user->user_id,
-            'title' => 'تم تقييمك',
+
+        // إنشاء الإشعار للطبيب
+        $notification = Notification::create([
+            'user_id' => $doctor_id, // الطبيب الذي سيستقبل الإشعار
+            'created_by' => $patient->user_id, // المريض الذي قام بالتقييم
+            'title' => 'تم تقييمك', 
             'message' => 'لقد قام المريض بتقييمك. تحقق من تقييمك.',
             'type' => 'general',
-            'is_read' => 0,
+            'is_read' => 0, // الإشعار غير مقروء بعد
         ]);
-    
-        return response()->json(['message' => 'تم التقييم بنجاح.'], 200);
+
+        return response()->json(['message' => 'تم التقييم بنجاح. تم إرسال إشعار للطبيب.'], 200);
     }
-    
 // دالة لعرض اسم الطبيب والتقييم الكلي
 public function getAllDoctorsRating()
 {
