@@ -284,4 +284,12 @@ class PatientController extends Controller
             return response()->json(['message' => 'تم حذف المريض بنجاح'], 200);
         });
     }
+// دالة لإرجاع عدد المرضى
+public function getPatientCount()
+{
+    // إرجاع عدد المرضى فقط
+    return response()->json([
+        'patient_count' => Patient::count()
+    ]);
+}
 }

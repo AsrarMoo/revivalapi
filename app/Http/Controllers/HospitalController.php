@@ -195,4 +195,16 @@ class HospitalController extends Controller
             return response()->json(['message' => 'تم حذف المستشفى بنجاح'], 200);
         });
     }
+
+    public function countHospital()
+{
+    $count = Hospital::count();
+
+    return response()->json([
+        'total_hospital' => $count,
+    ]);
+}
+
+
+
 }

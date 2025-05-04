@@ -115,6 +115,8 @@ class DoctorController extends Controller
         });
     }
     public function approveDoctor($request_id)
+    //$notification = Notification::where('request_id', $request_id)->first();
+
     {
         $notification = Notification::where('request_id', $requestId)->first();
     
@@ -558,5 +560,17 @@ public function simpleDoctors()
 
     return response()->json($doctors);
 }
+
+// ✅ دالة لإرجاع عدد الأطباء
+public function countDoctors()
+{
+    $count = Doctor::count();
+
+    return response()->json([
+        'total_doctors' => $count,
+    ]);
+}
+
+
 }
   

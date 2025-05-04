@@ -129,4 +129,12 @@ class HospitalDoctorRequestController extends Controller
 
         return response()->json($hospitals, 200);
     }
+    public function countHospitalDoctor()
+    {
+        $count = HospitalDoctor::count();
+    
+        return response()->json([
+            'total_doctors_in_hospital' => $count,
+        ]);
+    }
 }

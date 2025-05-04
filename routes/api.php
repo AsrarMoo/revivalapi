@@ -19,7 +19,13 @@ Route::prefix('auth')->group(function () {
     Route::post('/refresh', [AuthController::class, 'refreshToken']);
     Route::post('/register/doctor', [DoctorController::class, 'registerDoctor']);
     Route::get('specialties/list', [SpecialtyController::class, 'getSpecialties']);
-}); Route::get('specialties/doctor-count', [SpecialtyController::class, 'getSpecialtiesWithDoctorCount']);
+});
+ Route::get('specialties/doctor-count', [SpecialtyController::class, 'getSpecialtiesWithDoctorCount']);
+ Route::get('/countpatient', [PatientController::class, 'getPatientCount']);
+ Route::get('/counthospital', [HospitalController::class, 'countHospital']);
+ Route::get('/counthospitaldoctor', [HospitalDoctorRequestController::class, 'countHospitalDoctor']);
+ Route::get('/doctorrating', [DoctorRatingController::class, 'getAllDoctorsRating']);
+
 
 // ✅ المسارات المحمية (تتطلب توكن)
 Route::middleware('auth:api')->group(function () {
@@ -32,6 +38,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/{id}', [PatientController::class, 'show']);
         Route::post('/{id}', [PatientController::class, 'update']);
         Route::delete('/{id}', [PatientController::class, 'destroy']);
+      
     });
     Route::get('/profile', [PatientController::class, 'getProfile']);
 
@@ -46,7 +53,9 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/reject-doctor/{request_id}', [DoctorController::class, 'rejectDoctor']);
         Route::get('/hospitals', [DoctorController::class, 'getHospitals']);      
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
+        Route::get('/count', [DoctorController::class, 'countDoctors']);
         Route::get('/{id}', [DoctorController::class, 'showById']);
+        
        
 
 
@@ -61,6 +70,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/register', [HospitalController::class, 'register']);
         Route::get('/', [HospitalController::class, 'index']);
         Route::get('/{id}', [HospitalController::class, 'show']);
+       
+
         Route::put('/{id}', [HospitalController::class, 'update']);
         Route::delete('/{id}', [HospitalController::class, 'destroy']);
     });

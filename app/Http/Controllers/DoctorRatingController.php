@@ -74,4 +74,35 @@ class DoctorRatingController extends Controller
 
         return response()->json(['message' => 'تم التقييم بنجاح. تم إرسال إشعار للطبيب.'], 200);
     }
+  // دالة لعرض اسم الطبيب والتقييم الكلي
+// دالة لعرض اسم الطبيب والتقييم الكلي
+public function getAllDoctorsRating()
+{
+    // جلب جميع الأطباء مع التقييمات المرتبطة بهم
+    $doctors = Doctor::with('doctor_rataing')->get();  // استخدم العلاقة الصحيحة 'doctor_rataing'
+
+    // التحقق إذا كان هناك أطباء
+    if ($doctors->isEmpty()) {
+        return response()->json(['message' => 'لا يوجد أطباء في النظام.'], 200);
+    }
+
+    // تحضير البيانات للإرجاع مع التقييمات
+    $doctorRatings = $doctors->map(function ($doctor) {
+        // تحقق إذا كان الطبيب لديه تقييمات
+        $overallRating = $doctor->doctor_rataing->isNotEmpty() 
+                         ? $doctor->doctor_rataing->pluck('overall_rating')->first() 
+                         : 'لا يوجد تقييم'; 
+
+        return [
+            'doctor_name' => $doctor->doctor_name,
+        //    'specialty' => $doctor->specialty,
+            'overall_rating' => $overallRating, // التقييم الكلي المحسوب مسبقًا أو القيمة الافتراضية
+        ];
+    });
+
+    return response()->json($doctorRatings, 200);
+}
+
+
+  
 }

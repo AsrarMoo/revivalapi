@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Hospital extends Model
 {
     use HasFactory;
-
+    protected $table = 'hospitals';
     protected $primaryKey = 'hospital_id';
 
     protected $fillable = [
@@ -23,9 +23,7 @@ class Hospital extends Model
     ];
 
    
-    // App\Models\Hospital.php
-
-// App\Models\Hospital.php
+   
 
 public function user()
 {
