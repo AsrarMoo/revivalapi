@@ -91,35 +91,36 @@ class DoctorRatingController extends Controller
     
         return response()->json(['message' => 'تم التقييم بنجاح.'], 200);
     }
+    public function getAllDoctorsRating()
+    {
+        $doctors = Doctor::with('doctor_rataing', 'appointments')->get();
     
-// دالة لعرض اسم الطبيب والتقييم الكلي
-public function getAllDoctorsRating()
-{
-    // جلب جميع الأطباء مع التقييمات المرتبطة بهم
-    $doctors = Doctor::with('doctor_rataing')->get();  // استخدم العلاقة الصحيحة 'doctor_rataing'
-
-    // التحقق إذا كان هناك أطباء
-    if ($doctors->isEmpty()) {
-        return response()->json(['message' => 'لا يوجد أطباء في النظام.'], 200);
+        if ($doctors->isEmpty()) {
+            return response()->json(['message' => 'لا يوجد أطباء في النظام.'], 200);
+        }
+    
+        $doctorRatings = $doctors->map(function ($doctor) {
+            // حساب التقييم الكلي
+            $average = $doctor->doctor_rataing->avg('overall_rating');
+            $overallRating = $average ? round((float) $average, 1) : 'لا يوجد تقييم';
+    
+            // حساب عدد التقييمات
+            $totalRatings = $doctor->doctor_rataing->count();
+    
+            return [
+                'doctor_name'     => $doctor->doctor_name,
+                'doctor_image'    => $doctor->doctor_image,
+                'specialty'       => optional($doctor->specialty)->specialty_name ?? 'غير محدد',
+                'overall_rating'  => $overallRating,
+                'total_ratings'   => $totalRatings,  // عدد التقييمات
+                'experience_years'=> $doctor->experience_years ?? 'غير متوفر',
+                'monthly_bookings'=> $doctor->appointments->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
+            ];
+        });
+    
+        return response()->json($doctorRatings, 200);
     }
-
-    // تحضير البيانات للإرجاع مع التقييمات
-    $doctorRatings = $doctors->map(function ($doctor) {
-        // تحقق إذا كان الطبيب لديه تقييمات
-        $overallRating = $doctor->doctor_rataing->isNotEmpty() 
-                         ? $doctor->doctor_rataing->pluck('overall_rating')->first() 
-                         : 'لا يوجد تقييم'; 
-
-        return [
-            'doctor_name' => $doctor->doctor_name,
-        //    'specialty' => $doctor->specialty,
-            'overall_rating' => $overallRating, // التقييم الكلي المحسوب مسبقًا أو القيمة الافتراضية
-        ];
-    });
-
-    return response()->json($doctorRatings, 200);
-}
-
-
+    
+    
   
 }

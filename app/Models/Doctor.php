@@ -45,4 +45,8 @@ public function doctor_rataing()
     return $this->hasMany(DoctorRating::class, 'doctor_id', 'doctor_id');
 }
 
+public function appointments()
+{
+    return $this->hasMany(Appointment::class, 'doctor_id');
+}
 }

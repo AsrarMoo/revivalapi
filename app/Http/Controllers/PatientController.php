@@ -292,4 +292,17 @@ public function getPatientCount()
         'patient_count' => Patient::count()
     ]);
 }
+
+public function genderStatistics()
+{
+    $stats = Patient::selectRaw('patient_gender, COUNT(*) as count')
+        ->groupBy('patient_gender')
+        ->pluck('count', 'patient_gender');
+
+    return response()->json([
+        'male' => $stats['male'] ?? 0,
+        'female' => $stats['female'] ?? 0,
+    ]);
+}
+
 }

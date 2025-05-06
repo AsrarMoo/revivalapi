@@ -25,6 +25,15 @@ Route::prefix('auth')->group(function () {
  Route::get('/counthospital', [HospitalController::class, 'countHospital']);
  Route::get('/counthospitaldoctor', [HospitalDoctorRequestController::class, 'countHospitalDoctor']);
  Route::get('/doctorrating', [DoctorRatingController::class, 'getAllDoctorsRating']);
+ Route::get('/statistics', [PatientController::class, 'genderStatistics']);
+ Route::get('/hospital/dashboard', [HospitalController::class, 'dashboardStats']);
+ Route::get('/appointments/stats', [HospitalController::class, 'getAppointmentStats']);
+ Route::get('/appointments/monthly-stats', [HospitalController::class, 'getMonthlyStats']);
+ Route::get('/appointments/available-years', [HospitalController::class, 'getAvailableYears']);
+
+
+
+
 
 
 // ✅ المسارات المحمية (تتطلب توكن)
@@ -38,6 +47,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/{id}', [PatientController::class, 'show']);
         Route::post('/{id}', [PatientController::class, 'update']);
         Route::delete('/{id}', [PatientController::class, 'destroy']);
+        
+        
       
     });
     Route::get('/profile', [PatientController::class, 'getProfile']);

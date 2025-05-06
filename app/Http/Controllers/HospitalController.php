@@ -7,6 +7,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Models\Appointment;
+use App\Models\HospitalDoctor;
+use App\Models\Patient;
+use Carbon\Carbon;
+
 use App\Models\Hospital;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -204,7 +209,162 @@ class HospitalController extends Controller
         'total_hospital' => $count,
     ]);
 }
+public function allHospitalsStats()
+{
+    // جلب جميع المستشفيات
+    $hospitals = Hospital::all();
+
+    // دالة لإرجاع إحصائيات المستشفى
+    $hospitalStats = $hospitals->map(function ($hospital) {
+        return [
+            'hospital_name' => $hospital->name,
+            'hospital_id' => $hospital->id,
+            'stats' => $this->getHospitalStats($hospital->id),
+        ];
+    });
+
+    return response()->json($hospitalStats);
+}
+
+public function dashboardStats()
+{
+    // جلب جميع المستشفيات
+    $hospitals = Hospital::all(); // تأكد من أن لديك موديل للمستشفيات
+
+    // إحصائيات لكل مستشفى
+    $hospitalStats = $hospitals->map(function ($hospital) {
+        // عدد الحجوزات في هذا المستشفى
+        $appointmentsCount = Appointment::where('hospital_id', $hospital->hospital_id)->count();
+
+        // عدد الأطباء الذين يعملون في هذا المستشفى
+        $doctorsCount = HospitalDoctor::where('hospital_id', $hospital->hospital_id)->count();
+
+        // جلب جميع المرضى الذين لديهم حجوزات في هذا المستشفى
+        $patientIds = Appointment::where('hospital_id', $hospital->hospital_id)->pluck('patient_id')->unique();
+        $patients = Patient::whereIn('patient_id', $patientIds)->get();
+
+        // توزيع الجنس
+        $genderStats = $patients->groupBy('patient_gender')->map(function ($group) {
+            return $group->count();
+        });
+
+        // إذا لم يكن هناك بيانات، يتم إضافة صفر للذكور والإناث
+        $maleCount = $genderStats->get('male', 0);
+        $femaleCount = $genderStats->get('female', 0);
+
+        // توزيع العمر
+        $ageStats = $patients->groupBy(function ($patient) {
+            $age = Carbon::parse($patient->birth_date)->age;
+
+            if ($age <= 18) return '0-18';
+            elseif ($age <= 35) return '19-35';
+            elseif ($age <= 50) return '36-50';
+            else return '50+';
+        })->map->count();
+
+        return [
+            'hospital_name' => $hospital->hospital_name,  // اسم المستشفى
+            'hospital_id' => $hospital->hospital_id,      // معرف المستشفى
+            'stats' => [
+                'bookings_count' => $appointmentsCount,
+                'doctors_count' => $doctorsCount,
+                'gender_stats' => [
+                    'male' => $maleCount,
+                    'female' => $femaleCount,
+                ],
+                'age_stats' => $ageStats,
+            ],
+        ];
+    });
+
+    // إرجاع الإحصائيات الخاصة بجميع المستشفيات
+    return response()->json($hospitalStats);
+}
 
 
+public function getAppointmentStats(Request $request)
+{
+    $type = $request->query('type'); // 'day' أو 'month'
+    $dateInput = $request->query('date'); // مثلاً '2025-05-02' أو '2025-05'
+
+    if (!$type || !$dateInput) {
+        return response()->json(['error' => 'النوع أو التاريخ مفقود'], 400);
+    }
+
+    // تحويل التاريخ باستخدام Carbon
+    $date = Carbon::parse($dateInput);
+
+    // تحديد النطاقات
+    $startOfDay = $date->copy()->startOfDay();
+    $endOfDay = $date->copy()->endOfDay();
+
+    $startOfWeek = $date->copy()->startOfWeek(Carbon::SATURDAY);
+    $endOfWeek = $date->copy()->endOfWeek(Carbon::FRIDAY);
+
+    $startOfMonth = $date->copy()->startOfMonth();
+    $endOfMonth = $date->copy()->endOfMonth();
+
+    // حساب الإحصائيات
+    $todayBookings = Appointment::whereBetween('created_at', [$startOfDay, $endOfDay])->count();
+    $weekBookings = Appointment::whereBetween('created_at', [$startOfWeek, $endOfWeek])->count();
+    $monthBookings = Appointment::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+
+    // بيانات الرسم البياني (لكل يوم في الشهر)
+    $chartData = Appointment::selectRaw('DATE(created_at) as label, COUNT(*) as count')
+        ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+        ->groupBy('label')
+        ->orderBy('label')
+        ->get();
+
+    return response()->json([
+        'todayBookings' => $todayBookings,
+        'weekBookings' => $weekBookings,
+        'monthBookings' => $monthBookings,
+        'chartData' => $chartData,
+    ]);
+}
+public function getMonthlyStats(Request $request)
+{
+    // الحصول على السنة من الـ query parameters، إذا لم تكن موجودة نأخذ السنة الحالية
+    $year = $request->query('year', Carbon::now()->year);
+
+    // استرجاع إحصائيات الحجوزات حسب الشهر
+    $monthlyStats = Appointment::selectRaw('MONTH(created_at) as month, COUNT(*) as count')
+        ->whereYear('created_at', $year) // تحديد السنة
+        ->groupBy('month')
+        ->orderBy('month')
+        ->get();
+
+    // تجهيز مصفوفة تحتوي على أسماء الشهور وعدد الحجوزات في كل شهر
+    $months = [];
+    for ($i = 1; $i <= 12; $i++) {
+        // الحصول على اسم الشهر باستخدام Carbon وتحديد اللغة العربية
+        $monthName = Carbon::createFromDate($year, $i, 1)->locale('ar')->translatedFormat('F');
+        
+        // جلب عدد الحجوزات للشهر الحالي، إذا لم توجد حجوزات للشهر نضع القيمة صفر
+        $monthData = $monthlyStats->firstWhere('month', $i);
+        $months[] = [
+            'month' => $monthName,
+            'count' => $monthData ? $monthData->count : 0 // إذا لم توجد بيانات للشهر نضع صفر
+        ];
+    }
+
+    // إرجاع البيانات بتنسيق JSON
+    return response()->json($months);
+}
+// في Controller الخاص بالحجوزات
+public function getAvailableYears()
+{
+    // جلب السنوات المتاحة من البيانات (سنة الحجز من حقل تاريخ الحجز)
+    $years = DB::table('appointments')
+               ->selectRaw('YEAR(created_at) as year')
+               ->distinct()
+               ->orderByDesc('year') // ترتيب السنوات من الأحدث إلى الأقدم
+               ->pluck('year');
+
+    return response()->json($years);
+}
 
 }
+
+
