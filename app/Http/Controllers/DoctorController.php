@@ -32,7 +32,7 @@ class DoctorController extends Controller
             'email'          => 'required|email|unique:pending_doctors,email',
             'password'       => 'required|min:8|regex:/[A-Z]/|regex:/[0-9]/|regex:/[@$!%*?&]/', // القيود الخاصة بكلمة المرور
             'phone'          => 'required|string|max:15|unique:pending_doctors,phone',
-            'gender'         => 'required|in:ذكر,أنثى',
+            'gender'         => 'required|in:Male,Female',
             'specialty_name' => 'required|string', // اسم التخصص
             'qualification'  => 'required|string|max:255',
             'experience'     => 'required|integer|min:0',
@@ -118,7 +118,8 @@ class DoctorController extends Controller
     //$notification = Notification::where('request_id', $request_id)->first();
 
     {
-        $notification = Notification::where('request_id', $requestId)->first();
+        $notification = Notification::where('request_id', $request_id)->first();
+
     
         if (!$notification) {
             return response()->json(['message' => 'الإشعار غير موجود'], 404);
