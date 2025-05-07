@@ -114,77 +114,98 @@ class DoctorController extends Controller
             }
         });
     }
-public function approveDoctor($request_id)
-{
-    $notification = Notification::where('request_id', $request_id)->first();
-
-    if (!$notification) {
-        return response()->json(['message' => 'الإشعار غير موجود'], 404);
-    }
-
-    $request_id = $notification->request_id;
-
-    Log::info('البحث عن الطبيب في جدول pending_doctors حسب request_id', ['request_id' => $request_id]);
-
-    $pendingDoctor = PendingDoctor::where('id', $request_id)->first();
-
-    if (!$pendingDoctor) {
-        Log::warning('الطبيب غير موجود في قائمة الانتظار', ['request_id' => $request_id]);
-        return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار.'], 404);
-    }
-
-    return DB::transaction(function () use ($pendingDoctor, $notification) {
-        try {
-            $user = User::create([
-                'email'     => $pendingDoctor->email,
-                'password'  => Hash::make($pendingDoctor->password),
-                'user_type' => 'doctor',
-            ]);
-
-            $doctor = Doctor::create([
-                'doctor_name'           => $pendingDoctor->name,
-                'specialty_id'          => $pendingDoctor->specialty_id,
-                'doctor_qualification'  => $pendingDoctor->qualification,
-                'doctor_experience'     => $pendingDoctor->experience,
-                'doctor_bio'            => $pendingDoctor->bio,
-                'doctor_certificate'    => $pendingDoctor->certificate_path,
-                'doctor_image'          => $pendingDoctor->image_path,
-                'doctor_phone'          => $pendingDoctor->phone,
-                'user_id'               => $user->user_id,
-            ]);
-
-            $user->update(['doctor_id' => $doctor->doctor_id]);
-
-            DB::table('notifications')->insert([
-                'user_id'    => $user->user_id,
-                'request_id' => $notification->request_id,
-                'title'      => 'approval',
-                'type'       => 'approval',
-                'message'    => "تمت الموافقة على طلب تسجيلك كطبيب.",
-                'is_read'    => 0,
-                'created_at' => now(),
-            ]);
-
-            // ❌ لا نحذف الإشعار الأصلي
-            // $notification->delete();
-
-            $pendingDoctor->delete();
-
-            return response()->json([
-                'title'   => 'approve',
-                'message' => 'تمت الموافقة على الطبيب بنجاح!',
-                'doctor'  => $doctor,
-                'type'    => 'approval',
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('خطأ أثناء الموافقة', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'حدث خطأ أثناء المعالجة: ' . $e->getMessage()], 500);
+    public function approveDoctor($request_id)
+    {
+        $notification = Notification::where('request_id', $request_id)->first();
+    
+        if (!$notification) {
+            return response()->json(['message' => 'الإشعار غير موجود'], 404);
         }
-    });
-}
-
+    
+        $request_id = $notification->request_id;
+    
+        Log::info('البحث عن الطبيب في جدول pending_doctors حسب request_id', ['request_id' => $request_id]);
+    
+        $pendingDoctor = PendingDoctor::where('id', $request_id)->first();
+    
+        if (!$pendingDoctor) {
+            Log::warning('الطبيب غير موجود في قائمة الانتظار', ['request_id' => $request_id]);
+            return response()->json(['message' => 'الطبيب غير موجود في قائمة الانتظار.'], 404);
+        }
+    
+        // سجل بيانات الطبيب المعلق قبل الترحيل
+        Log::info('بيانات الطبيب المعلق قبل الترحيل', [
+            'name' => $pendingDoctor->name,
+            'email' => $pendingDoctor->email,
+            'certificate_path' => $pendingDoctor->certificate_path, // الشهادة
+            'image_path' => $pendingDoctor->image_path, // الصورة
+            'gender' => $pendingDoctor->gender, // الجنس
+            'qualification' => $pendingDoctor->qualification, // المؤهل
+            'bio' => $pendingDoctor->bio, // السيرة الذاتية
+            'phone' => $pendingDoctor->phone, // الهاتف
+        ]);
+    
+        return DB::transaction(function () use ($pendingDoctor, $notification) {
+            try {
+                $user = User::create([
+                    'email'     => $pendingDoctor->email,
+                    'password'  => Hash::make($pendingDoctor->password),
+                    'user_type' => 'doctor',
+                ]);
+    
+                $doctor = Doctor::create([
+                    'doctor_name'           => $pendingDoctor->name,
+                    'specialty_id'          => $pendingDoctor->specialty_id,
+                    'doctor_qualification'  => $pendingDoctor->qualification,
+                    'doctor_experience'     => $pendingDoctor->experience,
+                    'doctor_bio'            => $pendingDoctor->bio,
+                    'doctor_certificate'    => $pendingDoctor->certificate_path, // تأكد من أن الشهادة هنا
+                    'doctor_image'          => $pendingDoctor->image_path,
+                    'doctor_phone'          => $pendingDoctor->phone,
+                    'doctor_gender'         => $pendingDoctor->gender, // الجنس
+                    'user_id'               => $user->user_id,
+                ]);
+    
+                // سجل بيانات الطبيب بعد الترحيل
+                Log::info('تم ترحيل بيانات الطبيب إلى جدول doctors', [
+                    'doctor_id' => $doctor->doctor_id,
+                    'doctor_certificate' => $doctor->doctor_certificate, // تحقق من الحقل بعد الترحيل
+                    'doctor_gender' => $doctor->doctor_gender, // الجنس
+                ]);
+    
+                $user->update(['doctor_id' => $doctor->doctor_id]);
+    
+                DB::table('notifications')->insert([
+                    'user_id'    => $user->user_id,
+                    'request_id' => $notification->request_id,
+                    'title'      => 'approval',
+                    'type'       => 'approval',
+                    'message'    => "تمت الموافقة على طلب تسجيلك كطبيب.",
+                    'is_read'    => 0,
+                    'created_at' => now(),
+                ]);
+    
+                // ❌ لا نحذف الإشعار الأصلي
+                // $notification->delete();
+    
+                $pendingDoctor->delete();
+    
+                return response()->json([
+                    'title'   => 'approve',
+                    'message' => 'تمت الموافقة على الطبيب بنجاح!',
+                    'doctor'  => $doctor,
+                    'type'    => 'approval',
+                ], 200);
+    
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('خطأ أثناء الموافقة', ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'حدث خطأ أثناء المعالجة: ' . $e->getMessage()], 500);
+            }
+        });
+    }
+    
+    
 public function rejectDoctor($requestId)
 {
     $notification = Notification::where('request_id', $requestId)->first();
