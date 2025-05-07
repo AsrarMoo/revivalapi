@@ -113,7 +113,7 @@ class DoctorRatingController extends Controller
                 'specialty'       => optional($doctor->specialty)->specialty_name ?? 'غير محدد',
                 'overall_rating'  => $overallRating,
                 'total_ratings'   => $totalRatings,  // عدد التقييمات
-                'experience_years'=> $doctor->experience_years ?? 'غير متوفر',
+                'experience_years'=> $doctor->doctor_experience ?? 'غير متوفر',
                 'monthly_bookings'=> $doctor->appointments->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
             ];
         });
