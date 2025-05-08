@@ -10,52 +10,54 @@ use Illuminate\Support\Facades\Log;
 class AuthController extends Controller
 {
     // ✅ 1️⃣ تسجيل الدخول
-    public function login(Request $request)
-    {
-        // تحقق من البيانات المدخلة
-        $credentials = $request->validate([
-            'email' => 'required|string',
-            'password' => 'required|string'
-        ]);
-    
-        Log::info('محاولة تسجيل الدخول', ['email' => $credentials['email']]);
-    
-        // البحث عن المستخدم بالاسم
-        $user = User::where('email', $credentials['email'])->first();
-    
-        // التحقق من صحة البيانات
-        if (!$user) {
-            Log::error('المستخدم غير موجود', ['email' => $credentials['email']]);
-            return response()->json(['message' => 'اسم المستخدم أو كلمة المرور غير صحيحة'], 401);
-        }
-    
-        if (!Hash::check($credentials['password'], $user->password)) {
-            Log::error('كلمة المرور غير صحيحة', ['email' => $credentials['email']]);
-            return response()->json(['message' => 'اسم المستخدم أو كلمة المرور غير صحيحة'], 401);
-        }
-    
-        // 🔥 منع تسجيل الدخول إذا كان الحساب معطلاً
-        if ($user->is_active == 0) {
-            Log::warning('حساب معطل', ['email' => $credentials['email']]);
-            return response()->json(['message' => 'الحساب معطل. يرجى التواصل مع الإدارة.'], 403);
-        }
-    
-        // إنشاء التوكن باستخدام JWTAuth
-        try {
-            $token = JWTAuth::fromUser($user);
-            Log::info('تم إنشاء التوكن بنجاح', ['email' => $credentials['email'], 'token' => $token]);
-        } catch (\Exception $e) {
-            Log::error('فشل في إنشاء التوكن', ['email' => $credentials['email'], 'error' => $e->getMessage()]);
-            return response()->json(['message' => 'فشل في إنشاء التوكن'], 500);
-        }
-    
-        // تحديد واجهة المستخدم بناءً على نوع المستخدم
-        $redirect_to = $this->getUserRedirect($user->user_type);
-    
-        Log::info('تسجيل الدخول بنجاح', ['email' => $credentials['email'], 'user_type' => $user->user_type]);
-    
-        return $this->respondWithToken($token, $user->user_type, $redirect_to);
+// ✅ 1️⃣ تسجيل الدخول
+public function login(Request $request)
+{
+    // تحقق من البيانات المدخلة
+    $credentials = $request->validate([
+        'email' => 'required|string',
+        'password' => 'required|string'
+    ]);
+
+    Log::info('محاولة تسجيل الدخول', ['email' => $credentials['email']]);
+
+    // البحث عن المستخدم بالبريد الإلكتروني
+    $user = User::where('email', $credentials['email'])->first();
+
+    // التحقق من صحة البريد الإلكتروني
+    if (!$user) {
+        Log::error('البريد الإلكتروني غير موجود', ['email' => $credentials['email']]);
+        return response()->json(['message' => 'البريد الإلكتروني غير صحيح'], 401);
     }
+
+    // التحقق من صحة كلمة المرور
+    if (!Hash::check($credentials['password'], $user->password)) {
+        Log::error('كلمة المرور غير صحيحة', ['email' => $credentials['email']]);
+        return response()->json(['message' => 'كلمة المرور غير صحيحة'], 401);
+    }
+
+    // 🔥 منع تسجيل الدخول إذا كان الحساب معطلاً
+    if ($user->is_active == 0) {
+        Log::warning('حساب معطل', ['email' => $credentials['email']]);
+        return response()->json(['message' => 'الحساب معطل. يرجى التواصل مع الإدارة.'], 403);
+    }
+
+    // إنشاء التوكن باستخدام JWTAuth
+    try {
+        $token = JWTAuth::fromUser($user);
+        Log::info('تم إنشاء التوكن بنجاح', ['email' => $credentials['email'], 'token' => $token]);
+    } catch (\Exception $e) {
+        Log::error('فشل في إنشاء التوكن', ['email' => $credentials['email'], 'error' => $e->getMessage()]);
+        return response()->json(['message' => 'فشل في إنشاء التوكن'], 500);
+    }
+
+    // تحديد واجهة المستخدم بناءً على نوع المستخدم
+    $redirect_to = $this->getUserRedirect($user->user_type);
+
+    Log::info('تسجيل الدخول بنجاح', ['email' => $credentials['email'], 'user_type' => $user->user_type]);
+
+    return $this->respondWithToken($token, $user->user_type, $redirect_to);
+}
 
     // ✅ 2️⃣ الرد مع التوكن
     protected function respondWithToken($token, $userType, $redirectTo)

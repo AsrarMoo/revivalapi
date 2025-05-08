@@ -57,14 +57,8 @@ class DoctorController extends Controller
                 }
     
                 // ✅ حفظ الصورة بالامتداد الأصلي
-                $imagePath = null;
-                if ($request->hasFile('image')) {
-                    $imageFile = $request->file('image');
-                    $imageExtension = $imageFile->getClientOriginalExtension();
-                    $imageName = uniqid() . '.' . $imageExtension;
-                    $imagePath = $imageFile->storeAs('doctor_images', $imageName, 'public');
-                }
-    
+                 $imagePath = $request->hasFile('image') ? 
+                             $request->file('image')->store('doctor_images', 'public') : null;
                 // ✅ التحقق من وجود التخصص
                 $specialty = Specialty::where('specialty_name', $validatedData['specialty_name'])->first();
                 if (!$specialty) {
@@ -149,7 +143,7 @@ class DoctorController extends Controller
             try {
                 $user = User::create([
                     'email'     => $pendingDoctor->email,
-                    'password'  => Hash::make($pendingDoctor->password),
+                    'password'  => $pendingDoctor->password,
                     'user_type' => 'doctor',
                 ]);
     
@@ -159,6 +153,7 @@ class DoctorController extends Controller
                     'doctor_qualification'  => $pendingDoctor->qualification,
                     'doctor_experience'     => $pendingDoctor->experience,
                     'doctor_bio'            => $pendingDoctor->bio,
+                    'password' => $pendingDoctor->password, // لا تعيد تشفيرها
                     'doctor_certificate'    => $pendingDoctor->certificate_path, // تأكد من أن الشهادة هنا
                     'doctor_image'          => $pendingDoctor->image_path,
                     'doctor_phone'          => $pendingDoctor->phone,
