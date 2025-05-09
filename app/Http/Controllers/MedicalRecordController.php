@@ -16,8 +16,7 @@ use App\Models\MedicalRecordTest;
 use App\Models\RecordMedication; // تأكد من استيراد هذا النموذج
 
 class MedicalRecordController extends Controller
-{
-    public function storeMedicalRecordAndTests(Request $request)
+{public function storeMedicalRecordAndTests(Request $request)
     {
         // التحقق من البيانات المدخلة
         $validatedData = $request->validate([
@@ -30,32 +29,44 @@ class MedicalRecordController extends Controller
             'result_values' => 'nullable|array',
         ]);
     
-        // استرجاع بيانات الطبيب من التوكن
         $doctor = auth()->user();
-    
         Log::info('🟢 بدء تخزين السجل الطبي', ['request_data' => $validatedData]);
     
-        // التحقق مما إذا كان الطبيب مرتبطًا بأي مستشفى
+        // التحقق من ارتباط الطبيب بمشفى
         $doctorHospital = DB::table('hospital_doctors')
             ->where('doctor_id', $doctor->doctor_id)
             ->exists();
     
         if (!$doctorHospital) {
             Log::error('❌ الطبيب غير مرتبط بأي مستشفى', ['doctor_id' => $doctor->doctor_id]);
-            return response()->json(['message' => 'عذرًا، لا يمكنك إضافة سجل طبي لأنك غير مضاف لأي مستشفى'], 403);
+            return response()->json(['message' => '❌ لا يمكنك إضافة سجل طبي لأنك غير مضاف لأي مشفى'], 403);
         }
     
-        // استرجاع المريض والمستشفى
+        // استرجاع المريض والمشفى
         $patient = Patient::where('patient_name', $validatedData['patient_name'])->first();
         $hospital = Hospital::where('hospital_name', $validatedData['hospital_name'])->first();
     
-        // التأكد من وجود المريض والمستشفى
         if (!$patient || !$hospital) {
             Log::error('❌ المريض أو المستشفى غير موجود', [
                 'patient_name' => $validatedData['patient_name'],
                 'hospital_name' => $validatedData['hospital_name']
             ]);
-            return response()->json(['message' => 'المريض أو المستشفى غير موجود'], 404);
+            return response()->json(['message' => '❌ المريض أو المستشفى غير موجود'], 404);
+        }
+    
+        // التحقق من وجود حجز مؤكد بين المريض والطبيب
+        $hasBooking = DB::table('appointments')
+            ->where('doctor_id', $doctor->doctor_id)
+            ->where('patient_id', $patient->patient_id)
+            ->where('status', 'confirmed') // تأكد أن حالة الحجز لديك في الجدول هي "confirmed" أو ما يماثلها
+            ->exists();
+    
+        if (!$hasBooking) {
+            Log::warning('⚠️ محاولة إضافة سجل لمريض بدون حجز', [
+                'doctor_id' => $doctor->doctor_id,
+                'patient_id' => $patient->patient_id
+            ]);
+            return response()->json(['message' => '⚠️ لا يمكنك إضافة سجل لمريض لم يقم بالحجز لديك'], 403);
         }
     
         // إنشاء السجل الطبي
@@ -69,23 +80,20 @@ class MedicalRecordController extends Controller
     
         Log::info('✅ تم إنشاء السجل الطبي بنجاح', ['medical_record_id' => $medicalRecord->medical_record_id]);
     
-        // إضافة الأدوية إلى السجل الطبي
+        // حفظ الأدوية
         if (!empty($validatedData['medications'])) {
             foreach ($validatedData['medications'] as $medication_name) {
                 $medication = Medication::where('medication_name', $medication_name)->first();
                 if ($medication) {
                     $medicalRecord->medications()->attach($medication->medication_id);
-                    Log::info('💊 تم حفظ الدواء بنجاح', [
-                        'medication_name' => $medication_name,
-                        'medical_record_id' => $medicalRecord->medical_record_id
-                    ]);
+                    Log::info('💊 تم حفظ الدواء', ['medication_name' => $medication_name]);
                 } else {
                     Log::warning('⚠️ الدواء غير موجود', ['medication_name' => $medication_name]);
                 }
             }
         }
     
-        // إضافة الفحوصات ونتائجها للسجل الطبي
+        // حفظ الفحوصات
         if (!empty($validatedData['tests']) && !empty($validatedData['result_values'])) {
             foreach ($validatedData['tests'] as $index => $test_name) {
                 $test = Test::where('test_name', $test_name)->first();
@@ -95,12 +103,7 @@ class MedicalRecordController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
-    
-                    Log::info('🔬 تم حفظ نتيجة الفحص بنجاح', [
-                        'test_name' => $test_name,
-                        'result_value' => $validatedData['result_values'][$index],
-                        'medical_record_id' => $medicalRecord->medical_record_id
-                    ]);
+                    Log::info('🔬 تم حفظ الفحص', ['test_name' => $test_name]);
                 } else {
                     Log::warning('⚠️ الفحص غير موجود', ['test_name' => $test_name]);
                 }
@@ -500,6 +503,32 @@ public function getPatientRecordDetailsforpatient($medicalRecordId)
 
     // إذا لم يتم العثور على معرّف المريض في التوكن
     return response()->json(['error' => 'Patient ID not found in token'], 404);
+}
+public function getPatientsByDoctor()
+{
+    // الحصول على الطبيب المسجل دخوله
+    $doctor = auth()->user();
+
+    // التحقق من أن الطبيب موجود
+    if (!$doctor || !$doctor->doctor_id) {
+        return response()->json(['message' => '❌ الطبيب غير موجود'], 404);
+    }
+
+    // استرجاع المرضى الذين لديهم حجز مؤكد مع هذا الطبيب
+    $patients = DB::table('appointments')
+        ->join('patients', 'appointments.patient_id', '=', 'patients.patient_id')
+        ->where('appointments.doctor_id', $doctor->doctor_id)
+        ->where('appointments.status', 'confirmed') // تأكد من أن الحجز مؤكد
+        ->select('patients.*') // تحديد الحقول التي تريد استرجاعها من جدول المرضى
+        ->get();
+
+    // التحقق من وجود مرضى
+    if ($patients->isEmpty()) {
+        return response()->json(['message' => '❌ لا يوجد مرضى حجزوا عند هذا الطبيب'], 404);
+    }
+
+    // إرجاع المرضى في استجابة JSON
+    return response()->json(['patients' => $patients], 200);
 }
 
 }

@@ -209,6 +209,7 @@ Route::get('/hospital/appointments', [AppointmentController::class, 'getAppointm
 Route::prefix('medical-records')->group(function () {
    // روت لإنشاء سجل طبي جديد
    Route::post('/', [MedicalRecordController::class, 'storeMedicalRecordAndTests']);
+   Route::get('/patients', [MedicalRecordController::class, 'getPatientsByDoctor']);
    // روت لجلب قائمة أسماء المرضى الخاصة بالمشفى
    Route::get('/hospital/patient', [MedicalRecordController::class, 'getHospitalPatients']);
    // روت لجلب تواريخ السجلات الطبية للمريض الخاصة بالمشفى
@@ -276,6 +277,7 @@ Route::post('ambulance-request/send', [EmergencyController::class, 'findNearestH
 Route::post('/accept-other/{notificationId}', [EmergencyController::class, 'acceptAmbulanceRequestForOther']);
 
 Route::put('/ambulance/{rescueId}/mark-fake', [EmergencyController::class, 'markFakeAmbulanceRequest']);
+Route::put('unban-user/{id}', [EmergencyController::class, 'unbanUser']);
 
 });
 Route::prefix('pending')->group(function() {

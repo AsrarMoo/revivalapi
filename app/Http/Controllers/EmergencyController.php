@@ -543,5 +543,43 @@ public function rejectAmbulanceRequest($notificationId)
     }
     
         }
-    }}
+        
+    }
+    public function unbanUser($id)
+    {
+        // العثور على طلب الإسعاف باستخدام المعرف
+        $rescueRequest = AmbulanceRescue::find($id);
+    
+        if (!$rescueRequest) {
+            return response()->json(['message' => 'طلب الإسعاف غير موجود'], 404);
+        }
+    
+        // العثور على المستخدم الذي تم حظره بناءً على user_id
+        if ($rescueRequest->user_id) {
+            $user = User::find($rescueRequest->user_id);
+            if ($user) {
+                // إزالة الحظر عن المستخدم
+                $user->is_banned = false;
+                $user->save();
+    
+                // إرسال إشعار للمريض (إن كان هناك مستخدم مريض مرتبط)
+                $patientUser = User::where('patient_id', $rescueRequest->patient_id)->first();
+                if ($patientUser) {
+                    $patientNotification = new Notification();
+                    $patientNotification->user_id = $patientUser->user_id;
+                    $patientNotification->created_by = auth()->id(); // أو $hospitalUserId إذا كان لديك
+                    $patientNotification->title = '🚨 تم رفع الحظر عن حسابك';
+                    $patientNotification->message = 'تم رفع الحظر عن حسابك وأصبحت قادرًا على إرسال طلبات الإسعاف.';
+                    $patientNotification->type = 'general';
+                    $patientNotification->is_read = 0;
+                    $patientNotification->save();
+                }
+    
+                return response()->json(['message' => 'تم رفع الحظر عن المستخدم بنجاح.']);
+            }
+        }
+    
+        return response()->json(['message' => 'لم يتم العثور على المستخدم في الطلب'], 404);
+    }
+    }
     
