@@ -364,6 +364,30 @@ public function getAvailableYears()
 
     return response()->json($years);
 }
+public function getPatientsWithAppointments()
+{
+    $hospitalId = auth()->user()->hospital_id;
+
+    // جلب المرضى اللي عندهم حجوزات في المستشفى فقط (بدون تفاصيل المواعيد)
+    $patients = Patient::whereHas('appointments', function ($query) use ($hospitalId) {
+        $query->where('hospital_id', $hospitalId);
+    })->get();
+
+    if ($patients->isEmpty()) {
+        return response()->json([
+            'status' => false,
+            'message' => 'لا يوجد مرضى في المستشفى الخاص بك.',
+        ], 404);
+    }
+
+    return response()->json([
+        'status' => true,
+        'message' => 'تم جلب المرضى بنجاح.',
+        'patients' => $patients
+    ]);
+}
+
+
 
 }
 

@@ -30,6 +30,7 @@ Route::prefix('auth')->group(function () {
  Route::get('/appointments/stats', [HospitalController::class, 'getAppointmentStats']);
  Route::get('/appointments/monthly-stats', [HospitalController::class, 'getMonthlyStats']);
  Route::get('/appointments/available-years', [HospitalController::class, 'getAvailableYears']);
+ Route::get('/hospital/patient', [HospitalController::class, 'getPatientsWithAppointments']);
 
 
 
