@@ -235,6 +235,7 @@ public function reviewSchedule($notificationId)
         'user_id' => User::where('doctor_id', $schedule->doctor_id)->value('user_id'),
         'title' => $status === 'approved' ? 'تمت الموافقة على التعديل' : 'تم رفض تعديل الموعد',
         'message' => $message,
+        'created_by' => auth()->id(),
         'type' => 'booking',
         'is_read' => 0,
         'created_at' => now()
