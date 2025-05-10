@@ -359,7 +359,8 @@ public function getDoctorAppointments(Request $request)
                                    'patient.medicalRecords.medicalRecordTests.test',  // الفحوصات المرتبطة بالسجل
                                    'patient.medicalRecords.hospital',  // المستشفى المرتبطة بالسجل
                                    'schedule',  // ربط الموعد مع جدول مواعيد الطبيب
-                                   'hospital' // علاقة المستشفى من جدول الحجوزات
+                                   'hospital', // علاقة المستشفى من جدول الحجوزات
+                                   'doctor' // إضافة علاقة الطبيب
                                ])
                                ->get();
     
@@ -384,11 +385,7 @@ public function getDoctorAppointments(Request $request)
                     'appointment_end_time' => $appointmentEndTime->toTimeString(),
                     'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
                     'status' => $appointment->status, // حالة الموعد
-                    
-                    // إظهار اسم المستشفى باستخدام المعرف المرتبط من جدول الحجوزات
                     'hospital_name' => $appointment->hospital ? $appointment->hospital->hospital_name : 'لا يوجد مستشفى مرتبط',
-        
-                    // إذا لم يكن هناك سجل طبي
                     'medical_records' => 'لا يوجد سجل طبي لهذا المريض'
                 ];
             }
@@ -401,19 +398,16 @@ public function getDoctorAppointments(Request $request)
                 'appointment_end_time' => $appointmentEndTime->toTimeString(),
                 'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
                 'status' => $appointment->status, // حالة الموعد
-                
-                // إظهار اسم المستشفى باستخدام المعرف المرتبط من جدول الحجوزات
                 'hospital_name' => $appointment->hospital ? $appointment->hospital->hospital_name : 'لا يوجد مستشفى مرتبط',
-        
-                // تفاصيل السجل الطبي
-                'medical_records' => $appointment->patient->medicalRecords->map(function ($record) {
+                'medical_records' => $appointment->patient->medicalRecords->map(function ($record) use ($appointment) {
                     return [
                         'medical_record_id' => $record->medical_record_id,
                         'notes' => $record->notes,
                         'created_at' => Carbon::parse($record->created_at)->translatedFormat('j F Y، h:i A'),
-
-                        // اسم المستشفى المرتبط بالسجل الطبي
                         'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,
+                        
+                        // إضافة اسم الطبيب في السجل الطبي
+                        'doctor_name' => $appointment->doctor ? $appointment->doctor->doctor_name : 'لا يوجد طبيب مرتبط',
                 
                         // الأدوية المرتبطة بالسجل
                         'medications' => $record->recordMedications->map(function ($rm) {
@@ -433,7 +427,6 @@ public function getDoctorAppointments(Request $request)
         })
     ], 200);
 }
-
 
 public function cancelAppointment(Request $request, $appointmentId)
 {
