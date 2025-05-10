@@ -506,28 +506,29 @@ public function getPatientRecordDetailsforpatient($medicalRecordId)
 }
 public function getPatientsByDoctor()
 {
-    // الحصول على الطبيب المسجل دخوله
     $doctor = auth()->user();
 
-    // التحقق من أن الطبيب موجود
     if (!$doctor || !$doctor->doctor_id) {
         return response()->json(['message' => '❌ الطبيب غير موجود'], 404);
     }
 
-    // استرجاع المرضى الذين لديهم حجز مؤكد مع هذا الطبيب
     $patients = DB::table('appointments')
         ->join('patients', 'appointments.patient_id', '=', 'patients.patient_id')
         ->where('appointments.doctor_id', $doctor->doctor_id)
-        ->where('appointments.status', 'confirmed') // تأكد من أن الحجز مؤكد
-        ->select('patients.*') // تحديد الحقول التي تريد استرجاعها من جدول المرضى
+        ->where('appointments.status', 'confirmed')
+        ->select(
+            'patients.patient_id',
+            'patients.user_id',
+            'patients.patient_name',
+           
+        )
+        ->distinct()
         ->get();
 
-    // التحقق من وجود مرضى
     if ($patients->isEmpty()) {
         return response()->json(['message' => '❌ لا يوجد مرضى حجزوا عند هذا الطبيب'], 404);
     }
 
-    // إرجاع المرضى في استجابة JSON
     return response()->json(['patients' => $patients], 200);
 }
 

@@ -171,18 +171,23 @@ public function update(Request $request, $id)
         return response()->json(['error' => 'لم يتم العثور على المستخدم المسؤول عن المستشفى'], 500);
     }
 
-    // 🔹 إنشاء معرف الطلب (request_id) في جدول الإشعارات
-    $requestId = DB::table('notifications')->insertGetId([
-        'user_id' => $hospitalUserId,
-        'title' => 'طلب تعديل موعد',
-        'message' => 'تم طلب تعديل موعد من قبل الطبيب ' . auth()->user()->name . 
-                    ' من ' . $oldStartTime . ' - ' . $oldEndTime . 
-                    ' إلى ' . $request->start_time . ' - ' . $request->end_time . 
-                    '، يرجى الموافقة أو الرفض.',
-        'type' => 'editing',
-        'is_read' => 0,
-        'created_at' => Carbon::now(),
-    ]);
+    $doctor = DB::table('doctors')
+    ->where('user_id', auth()->id())
+    ->first();
+
+$doctorName = $doctor ? $doctor->doctor_name : 'الطبيب';
+
+$requestId = DB::table('notifications')->insertGetId([
+    'user_id' => $hospitalUserId,
+    'title' => 'طلب تعديل موعد',
+    'message' => 'تم طلب تعديل موعد من قبل الطبيب ' . $doctorName .
+                ' من ' . $oldStartTime . ' - ' . $oldEndTime .
+                ' إلى ' . $request->start_time . ' - ' . $request->end_time .
+                '، يرجى الموافقة أو الرفض.',
+    'type' => 'editing',
+    'is_read' => 0,
+    'created_at' => Carbon::now(),
+]);
 
     // تحديث الإشعار بإضافة معرف الطلب (request_id)
     DB::table('notifications')->where('notification_id', $requestId)->update([

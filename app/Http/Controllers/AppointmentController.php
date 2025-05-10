@@ -179,7 +179,7 @@ $patientName = $appointment->patient?->patient_name ?? 'غير معروف';
 $hospitalName = $appointment->hospital?->hospital_name ?? 'مجهول';
 
 // رسالة الإشعار النهائية
-$notification->message = 'لقد تم حجز موعد معك من قبل المريض ' . $patientName . ' في مستشفى ' . $hospitalName . '.';
+$notification->message = ' لديك حجز جديد مع المريض ' . $patientName . ' في  ' . $hospitalName . '.';
 
 $notification->type = 'booking';
 $notification->is_read = 0;
