@@ -81,7 +81,7 @@ class AppointmentController extends Controller
         $this->sendNotificationToHospital($hospital, $appointment);
     
         return response()->json([
-            'message' => 'تم إضافة الموعد بنجاح. ينتظر تأكيد المستشفى.',
+            'message' => 'تم إضافة الموعد بنجاح. بانتظار تأكيد المستشفى.',
             'data' => $appointment
         ], 201);
     }
@@ -94,7 +94,7 @@ class AppointmentController extends Controller
         $notification->user_id = $hospital->user_id; // معرف المستخدم الخاص بالمستشفى
         $notification->created_by = auth()->user()->patient_id; // يتم وضع معرف المريض الذي أضاف الموعد
         $notification->title = "موعد جديد منتظر تأكيدك";
-        $notification->message = "تم إضافة موعد جديد مع الطبيب " . $appointment->doctor->doctor_name . " في المستشفى " . $appointment->hospital->hospital_name . " ينتظر تأكيدك.";
+        $notification->message = "تم طلب حجز جديد مع الطبيب " . $appointment->doctor->doctor_name . " من قبل المريض " . $appointment->patient->patient_name . " وينتظر تأكيدك.";
         $notification->type = 'booking'; // نوع الإشعار (حجز)
         $notification->is_read = 0; // إشعار غير مقروء
         $notification->request_id = $appointment->appointment_id;
@@ -150,7 +150,7 @@ class AppointmentController extends Controller
         $notification->user_id = $patient->user_id;  // تحديد المستخدم (المريض)
         $notification->created_by = auth()->user()->id ?? $appointment->hospital->user_id;  // من قام بإنشاء الإشعار (المستشفى) 
         $notification->title = 'تمت الموافقة على حجزك';
-        $notification->message = 'تم تأكيد حجزك مع الدكتور ' . $appointment->doctor->doctor_name . 
+        $notification->message = 'تم تأكيد حجزك مع الطبيب ' . $appointment->doctor->doctor_name . 
         ' في مستشفى ' . $appointment->hospital->hospital_name . 
         '. يمكنك تقييم الطبيب الذي قمت بالحجز لديه خلال 24 ساعة من تاريخ الحجز.';
     
@@ -162,18 +162,30 @@ class AppointmentController extends Controller
     
     private function sendNotificationToDoctor($appointment)
     {
-        // إرسال إشعار للطبيب بأن لديه موعدًا مع مريض
-        $doctor = Doctor::find($appointment->doctor_id); // الحصول على الطبيب باستخدام doctor_id
-    
-        $notification = new Notification();
-        $notification->user_id = $doctor->user_id;  // تحديد المستخدم (الطبيب)
-        $notification->created_by = auth()->user()->id ?? $appointment->hospital->user_id; // من قام بإنشاء الإشعار (المستشفى)
-        $notification->title = 'تم حجز موعد لك';
-        $notification->message = 'لقد تم حجز موعد معك من قبل المريض ' . $appointment->patient->name . ' في مستشفى ' . $appointment->hospital->hospital_name . '.';
-        $notification->type = 'booking';  // نوع الإشعار
-        $notification->is_read = 0; // تعيين الإشعار كغير مقروء
-        $notification->save();
+        // التأكد من تحميل المريض مع الموعد بشكل مسبق
+    // تحميل العلاقات قبل الاستخدام
+$appointment = Appointment::with(['patient', 'hospital'])->find($appointment->appointment_id);
+
+$doctor = Doctor::find($appointment->doctor_id);
+
+// إنشاء الإشعار
+$notification = new Notification();
+$notification->user_id = $doctor->user_id;
+$notification->created_by = auth()->user()->id ?? $appointment->hospital->user_id;
+$notification->title = 'تم حجز موعد لك';
+
+// التأكد من وجود اسم المريض والمستشفى
+$patientName = $appointment->patient?->patient_name ?? 'غير معروف';
+$hospitalName = $appointment->hospital?->hospital_name ?? 'مجهول';
+
+// رسالة الإشعار النهائية
+$notification->message = 'لقد تم حجز موعد معك من قبل المريض ' . $patientName . ' في مستشفى ' . $hospitalName . '.';
+
+$notification->type = 'booking';
+$notification->is_read = 0;
+$notification->save();
     }
+    
     
     //رفض حجز 
     public function rejectAppointment($notificationId)
@@ -229,45 +241,142 @@ class AppointmentController extends Controller
     $notification->is_read = 0; // تعيين الإشعار كغير مقروء
     $notification->save();
 }
-
-    public function getHospitalAppointments(Request $request)
-    {
-        // الحصول على بيانات المستخدم
-        $user = auth()->user();
-        
-        // التحقق من المستشفى المرتبطة بالمستخدم
-        $hospitalId = $user->hospital_id;
-        
-        // التحقق إذا كان المستخدم مرتبطًا بمستشفى
-        if (!$hospitalId) {
-            return response()->json(['error' => 'المستخدم ليس مرتبطًا بأي مستشفى.'], 400);
-        }
-        
-        // البحث عن جميع الحجوزات للمستشفى وحالة الحجز "موافقة"
-        $appointments = Appointment::where('hospital_id', $hospitalId)
-                                   ->where('status', 'Confirmed')  // جلب الحجوزات ذات الحالة "موافقة"
-                                   ->with([
-                                       'patient',
-                                       'patient.medicalRecords.recordMedications.medication',  // الأدوية المرتبطة بالسجل
-                                       'patient.medicalRecords.medicalRecordTests.test',  // الفحوصات المرتبطة بالسجل
-                                       'patient.medicalRecords.doctor',  // الطبيب المرتبط بالسجل
-                                       'patient.medicalRecords.hospital',  // المستشفى المرتبطة بالسجل
-                                       'schedule'  // ربط الموعد مع جدول مواعيد الطبيب
-                                   ])
-                                   ->get();
-        
-        // التحقق إذا كانت الحجوزات فارغة
-        if ($appointments->isEmpty()) {
-            return response()->json(['message' => 'لا توجد حجوزات موافق عليها للمستشفى.'], 404);
-        }
-        
-        // إرجاع الحجوزات مع تفاصيل المرضى والسجلات الطبية والأدوية والفحوصات
-        return response()->json([
-            'appointments' => $appointments->map(function ($appointment) {
-                $schedule = $appointment->schedule;  // جدول مواعيد الطبيب المرتبط بالموعد
-                $appointmentStartTime = Carbon::parse($schedule->start_time);
-                $appointmentEndTime = Carbon::parse($schedule->end_time);
+public function getHospitalAppointments(Request $request)
+{
+    // الحصول على بيانات المستخدم
+    $user = auth()->user();
     
+    // التحقق من المستشفى المرتبطة بالمستخدم
+    $hospitalId = $user->hospital_id;
+    
+    // التحقق إذا كان المستخدم مرتبطًا بمستشفى
+    if (!$hospitalId) {
+        return response()->json(['error' => 'المستخدم ليس مرتبطًا بأي مستشفى.'], 400);
+    }
+    
+    // البحث عن جميع الحجوزات للمستشفى وحالة الحجز "موافقة"
+    $appointments = Appointment::where('hospital_id', $hospitalId)
+                               ->where('status', 'Confirmed')  // جلب الحجوزات ذات الحالة "موافقة"
+                               ->with([
+                                   'patient',
+                                   'patient.medicalRecords.recordMedications.medication',  // الأدوية المرتبطة بالسجل
+                                   'patient.medicalRecords.medicalRecordTests.test',  // الفحوصات المرتبطة بالسجل
+                                   'patient.medicalRecords.hospital',  // المستشفى المرتبطة بالسجل
+                                   'schedule',  // ربط الموعد مع جدول مواعيد الطبيب
+                                   'doctor' // ربط جدول الأطباء للحصول على اسم الطبيب
+                               ])
+                               ->get();
+    
+    // التحقق إذا كانت الحجوزات فارغة
+    if ($appointments->isEmpty()) {
+        return response()->json(['message' => 'لا توجد حجوزات موافق عليها للمستشفى.'], 404);
+    }
+    
+    // إرجاع الحجوزات مع تفاصيل المرضى والسجلات الطبية والأدوية والفحوصات
+    return response()->json([
+        'appointments' => $appointments->map(function ($appointment) {
+            $schedule = $appointment->schedule;  // جدول مواعيد الطبيب المرتبط بالموعد
+            $appointmentStartTime = Carbon::parse($schedule->start_time);
+            $appointmentEndTime = Carbon::parse($schedule->end_time);
+
+            // إذا كان المريض لا يملك سجل طبي
+            if ($appointment->patient->medicalRecords->isEmpty()) {
+                return [
+                    'appointment_id' => $appointment->appointment_id,
+                    'patient_name' => $appointment->patient->patient_name,
+                    'appointment_start_time' => $appointmentStartTime->toTimeString(),
+                    'appointment_end_time' => $appointmentEndTime->toTimeString(),
+                    'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
+                    'status' => $appointment->status, // حالة الموعد
+                    'doctor_name' => $appointment->doctor ? $appointment->doctor->doctor_name : 'غير متوفر',  // اسم الطبيب إذا موجود
+                    'medical_records' => 'لا يوجد سجل طبي لهذا المريض'  // رسالة عندما لا يوجد سجل طبي
+                ];
+            }
+
+            // إذا كان المريض يملك سجل طبي، نعرض البيانات كما هو الحال
+            $doctorName = $appointment->doctor ? $appointment->doctor->doctor_name : 'غير متوفر';  // اسم الطبيب من جدول الطبيب
+            
+            return [
+                'appointment_id' => $appointment->appointment_id,
+                'patient_name' => $appointment->patient->patient_name,
+                'appointment_start_time' => $appointmentStartTime->toTimeString(),
+                'appointment_end_time' => $appointmentEndTime->toTimeString(),
+                'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
+                'status' => $appointment->status, // حالة الموعد
+                'doctor_name' => $doctorName, // اسم الطبيب
+
+                // تفاصيل السجل الطبي
+                'medical_records' => $appointment->patient->medicalRecords->map(function ($record) {
+                    return [
+                        'medical_record_id' => $record->medical_record_id,
+                        'notes' => $record->notes,
+                        'created_at' => $record->created_at,
+                        
+                        // اسم الطبيب إذا كان موجودًا في السجل الطبي
+                        'doctor_name' => $record->doctor ? $record->doctor->doctor_name : null,
+                
+                        // اسم المستشفى
+                        'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,
+                
+                        // الأدوية المرتبطة بالسجل
+                        'medications' => $record->recordMedications->map(function ($rm) {
+                            return $rm->medication->medication_name ?? null;
+                        })->filter(),
+                
+                        // الفحوصات المرتبطة بالسجل
+                        'tests' => $record->medicalRecordTests->map(function ($test) {
+                            return [
+                                'test_name' => $test->test->test_name ?? null,
+                                'result' => $test->result_value
+                            ];
+                        })->filter()
+                    ];
+                })
+            ];
+        })
+    ], 200);
+}
+
+public function getDoctorAppointments(Request $request)
+{
+    // الحصول على بيانات المستخدم
+    $user = auth()->user();
+    
+    // التحقق من الطبيب المرتبط بالمستخدم
+    $doctorId = $user->doctor_id;
+    
+    // التحقق إذا كان المستخدم مرتبطًا بطبيب
+    if (!$doctorId) {
+        return response()->json(['error' => 'المستخدم ليس مرتبطًا بأي طبيب.'], 400);
+    }
+    
+    // البحث عن جميع الحجوزات للطبيب وحالة الحجز "موافقة"
+    $appointments = Appointment::where('doctor_id', $doctorId)
+                               ->where('status', 'Confirmed')  // جلب الحجوزات ذات الحالة "موافقة"
+                               ->with([
+                                   'patient',
+                                   'patient.medicalRecords.recordMedications.medication',  // الأدوية المرتبطة بالسجل
+                                   'patient.medicalRecords.medicalRecordTests.test',  // الفحوصات المرتبطة بالسجل
+                                   'patient.medicalRecords.hospital',  // المستشفى المرتبطة بالسجل
+                                   'schedule',  // ربط الموعد مع جدول مواعيد الطبيب
+                                   'hospital' // علاقة المستشفى من جدول الحجوزات
+                               ])
+                               ->get();
+    
+    // التحقق إذا كانت الحجوزات فارغة
+    if ($appointments->isEmpty()) {
+        return response()->json(['message' => 'لا توجد حجوزات موافق عليها للطبيب.'], 404);
+    }
+    
+    // إرجاع الحجوزات مع تفاصيل المرضى والسجلات الطبية والأدوية والفحوصات
+    return response()->json([
+        'appointments' => $appointments->map(function ($appointment) {
+            $schedule = $appointment->schedule;  // جدول مواعيد الطبيب المرتبط بالموعد
+            $appointmentStartTime = Carbon::parse($schedule->start_time);
+            $appointmentEndTime = Carbon::parse($schedule->end_time);
+        
+            // إذا كان المريض ليس لديه سجل طبي
+            if ($appointment->patient->medicalRecords->isEmpty()) {
                 return [
                     'appointment_id' => $appointment->appointment_id,
                     'patient_name' => $appointment->patient->patient_name,
@@ -276,121 +385,55 @@ class AppointmentController extends Controller
                     'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
                     'status' => $appointment->status, // حالة الموعد
                     
-                    // إضافة اسم الطبيب بدلاً من التاريخ
-                    'doctor_name' => $appointment->patient->medicalRecords->first()->doctor->doctor_name ?? null,
-    
-                    // تفاصيل السجل الطبي
-                    'medical_records' => $appointment->patient->medicalRecords->map(function ($record) {
-                        return [
-                            'medical_record_id' => $record->medical_record_id,
-                            'notes' => $record->notes,
-                            'created_at' => $record->created_at,
-                            
-                            // اسم الطبيب
-                            'doctor_name' => $record->doctor ? $record->doctor->doctor_name : null,
-            
-                            // اسم المستشفى
-                            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,
-            
-                            // الأدوية المرتبطة بالسجل
-                            'medications' => $record->recordMedications->map(function ($rm) {
-                                return $rm->medication->medication_name ?? null;
-                            })->filter(),
-            
-                            // الفحوصات المرتبطة بالسجل
-                            'tests' => $record->medicalRecordTests->map(function ($test) {
-                                return [
-                                    'test_name' => $test->test->test_name ?? null,
-                                    'result' => $test->result_value
-                                ];
-                            })->filter()
-                        ];
-                    })
+                    // إظهار اسم المستشفى باستخدام المعرف المرتبط من جدول الحجوزات
+                    'hospital_name' => $appointment->hospital ? $appointment->hospital->hospital_name : 'لا يوجد مستشفى مرتبط',
+        
+                    // إذا لم يكن هناك سجل طبي
+                    'medical_records' => 'لا يوجد سجل طبي لهذا المريض'
                 ];
-            })
-        ], 200);
-    }
-    
-    public function getDoctorAppointments(Request $request)
-    {
-        // الحصول على بيانات المستخدم
-        $user = auth()->user();
-        
-        // التحقق من الطبيب المرتبط بالمستخدم
-        $doctorId = $user->doctor_id;
-        
-        // التحقق إذا كان المستخدم مرتبطًا بطبيب
-        if (!$doctorId) {
-            return response()->json(['error' => 'المستخدم ليس مرتبطًا بأي طبيب.'], 400);
-        }
-        
-        // البحث عن جميع الحجوزات للطبيب وحالة الحجز "موافقة"
-        $appointments = Appointment::where('doctor_id', $doctorId)
-                                   ->where('status', 'Confirmed')  // جلب الحجوزات ذات الحالة "موافقة"
-                                   ->with([
-                                       'patient',
-                                       'patient.medicalRecords.recordMedications.medication',  // الأدوية المرتبطة بالسجل
-                                       'patient.medicalRecords.medicalRecordTests.test',  // الفحوصات المرتبطة بالسجل
-                                       'patient.medicalRecords.hospital',  // المستشفى المرتبطة بالسجل
-                                       'schedule'  // ربط الموعد مع جدول مواعيد الطبيب
-                                   ])
-                                   ->get();
-        
-        // التحقق إذا كانت الحجوزات فارغة
-        if ($appointments->isEmpty()) {
-            return response()->json(['message' => 'لا توجد حجوزات موافق عليها للطبيب.'], 404);
-        }
-        
-        // إرجاع الحجوزات مع تفاصيل المرضى والسجلات الطبية والأدوية والفحوصات
-        return response()->json([
-            'appointments' => $appointments->map(function ($appointment) {
-                $schedule = $appointment->schedule;  // جدول مواعيد الطبيب المرتبط بالموعد
-                $appointmentStartTime = Carbon::parse($schedule->start_time);
-                $appointmentEndTime = Carbon::parse($schedule->end_time);
-        
-                return [
-                    'appointment_id' => $appointment->appointment_id,
-                    'patient_name' => $appointment->patient->patient_name,
-                    'appointment_start_time' => $appointmentStartTime->toTimeString(),
-                    'appointment_end_time' => $appointmentEndTime->toTimeString(),
-                    'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
-                    'status' => $appointment->status, // حالة الموعد
-                    
-                    // إضافة اسم المستشفى بدلاً من اسم الطبيب
-                    'hospital_name' => $appointment->patient->medicalRecords->first()->hospital->hospital_name ?? null,
-        
-                    // تفاصيل السجل الطبي
-                    'medical_records' => $appointment->patient->medicalRecords->map(function ($record) {
-                        return [
-                            'medical_record_id' => $record->medical_record_id,
-                            'notes' => $record->notes,
-                            'created_at' => Carbon::parse($record->created_at)->translatedFormat('j F Y، h:i A'),
+            }
 
-                            
-                            // اسم المستشفى
-                            'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,
-                    
-                            // الأدوية المرتبطة بالسجل
-                            'medications' => $record->recordMedications->map(function ($rm) {
-                                return $rm->medication->medication_name ?? null;
-                            })->filter(),
-                    
-                            // الفحوصات المرتبطة بالسجل
-                            'tests' => $record->medicalRecordTests->map(function ($test) {
-                                return [
-                                    'test_name' => $test->test->test_name ?? null,
-                                    'result' => $test->result_value
-                                ];
-                            })->filter()
-                        ];
-                    })
-                ];
-            })
-        ], 200);
-    }
-    
+            // إذا كان المريض يملك سجل طبي، نعرض البيانات كما هو الحال
+            return [
+                'appointment_id' => $appointment->appointment_id,
+                'patient_name' => $appointment->patient->patient_name,
+                'appointment_start_time' => $appointmentStartTime->toTimeString(),
+                'appointment_end_time' => $appointmentEndTime->toTimeString(),
+                'day_of_week' => $schedule->day_of_week, // يوم الأسبوع
+                'status' => $appointment->status, // حالة الموعد
+                
+                // إظهار اسم المستشفى باستخدام المعرف المرتبط من جدول الحجوزات
+                'hospital_name' => $appointment->hospital ? $appointment->hospital->hospital_name : 'لا يوجد مستشفى مرتبط',
+        
+                // تفاصيل السجل الطبي
+                'medical_records' => $appointment->patient->medicalRecords->map(function ($record) {
+                    return [
+                        'medical_record_id' => $record->medical_record_id,
+                        'notes' => $record->notes,
+                        'created_at' => Carbon::parse($record->created_at)->translatedFormat('j F Y، h:i A'),
 
-    
+                        // اسم المستشفى المرتبط بالسجل الطبي
+                        'hospital_name' => $record->hospital ? $record->hospital->hospital_name : null,
+                
+                        // الأدوية المرتبطة بالسجل
+                        'medications' => $record->recordMedications->map(function ($rm) {
+                            return $rm->medication->medication_name ?? null;
+                        })->filter(),
+                
+                        // الفحوصات المرتبطة بالسجل
+                        'tests' => $record->medicalRecordTests->map(function ($test) {
+                            return [
+                                'test_name' => $test->test->test_name ?? null,
+                                'result' => $test->result_value
+                            ];
+                        })->filter()
+                    ];
+                })
+            ];
+        })
+    ], 200);
+}
+
 
 public function cancelAppointment(Request $request, $appointmentId)
 {

@@ -368,10 +368,12 @@ public function getPatientsWithAppointments()
 {
     $hospitalId = auth()->user()->hospital_id;
 
-    // جلب المرضى اللي عندهم حجوزات في المستشفى فقط (بدون تفاصيل المواعيد)
-    $patients = Patient::whereHas('appointments', function ($query) use ($hospitalId) {
-        $query->where('hospital_id', $hospitalId);
-    })->get();
+    // جلب المرضى الذين لديهم حجوزات في المستشفى فقط مع إضافة البريد الإلكتروني
+    $patients = Patient::with('user') // إضافة علاقة 'user' لجلب بيانات المستخدم
+                        ->whereHas('appointments', function ($query) use ($hospitalId) {
+                            $query->where('hospital_id', $hospitalId);
+                        })
+                        ->get();
 
     if ($patients->isEmpty()) {
         return response()->json([
@@ -380,10 +382,32 @@ public function getPatientsWithAppointments()
         ], 404);
     }
 
+    // إرجاع المرضى مع تفاصيلهم والبريد الإلكتروني
     return response()->json([
         'status' => true,
         'message' => 'تم جلب المرضى بنجاح.',
-        'patients' => $patients
+        'patients' => $patients->map(function ($patient) {
+            return [
+                'patient_id' => $patient->patient_id,
+                'user_id' => $patient->user_id,
+                'patient_name' => $patient->patient_name,
+                'patient_age' => $patient->patient_age,
+                'patient_birthdate' => $patient->patient_birthdate,
+                'patient_blood_type' => $patient->patient_blood_type,
+                'patient_phone' => $patient->patient_phone,
+                'patient_address' => $patient->patient_address,
+                'patient_status' => $patient->patient_status,
+                'patient_height' => $patient->patient_height,
+                'patient_weight' => $patient->patient_weight,
+                'patient_nationality' => $patient->patient_nationality,
+                'patient_gender' => $patient->patient_gender,
+                'patient_image' => $patient->patient_image,
+                'patient_notes' => $patient->patient_notes,
+                'created_at' => $patient->created_at,
+                'updated_at' => $patient->updated_at,
+                'email' => $patient->user->email ?? null, // إضافة البريد الإلكتروني
+            ];
+        })
     ]);
 }
 
