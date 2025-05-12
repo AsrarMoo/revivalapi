@@ -31,6 +31,7 @@ Route::prefix('auth')->group(function () {
  Route::get('/appointments/monthly-stats', [HospitalController::class, 'getMonthlyStats']);
  Route::get('/appointments/available-years', [HospitalController::class, 'getAvailableYears']);
  Route::get('/hospital/patient', [HospitalController::class, 'getPatientsWithAppointments']);
+ Route::get('/doctor-hospital', [DoctorController::class, 'getDoctorsWithDetails']);
 
 
 
@@ -67,6 +68,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/image', [DoctorController::class, 'simpleDoctors']);
         Route::get('/count', [DoctorController::class, 'countDoctors']);
         Route::get('/{id}', [DoctorController::class, 'showById']);
+      
+
         
        
 

@@ -10,9 +10,11 @@ use App\Models\Doctor;
 use App\Models\User;
 use App\Models\Notification;
 use App\Models\Specialty;
+use App\Models\PendingDoctor;
+use App\Models\HospitalDoctor;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
-use App\Models\PendingDoctor;
+
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 
@@ -578,6 +580,17 @@ public function countDoctors()
     ]);
 }
 
+public function getDoctorsWithDetails()
+{
+    $doctors = HospitalDoctor::with(['doctor.specialty'])->get()->map(function ($item) {
+        return [
+            'doctor_name'  => $item->doctor->doctor_name,
+            'doctor_image' => $item->doctor->doctor_image,
+            'specialty'    => $item->doctor->specialty->specialty_name ?? 'غير محدد',
+        ];
+    });
 
+    return response()->json($doctors);
+}
 }
   
