@@ -104,8 +104,8 @@ class HospitalDoctorRequestApprovalController extends Controller
                     'created_by' => $user->user_id,
                     'title' => 'تحديث حالة طلب إضافة طبيب',
                     'message' => $status === 'accept' 
-                                ? "تمت الموافقة على طلب إضافة الطبيب بنجاح من قبل مستشفى {$hospitalName}." 
-                                : "تم رفض طلب إضافة الطبيب من قبل مستشفى {$hospitalName}.",
+                                ? "تمت الموافقة على طلب إضافة الطبيب بنجاح من قبل  {$hospitalName}." 
+                                : "تم رفض طلب إضافة الطبيب من قبل  {$hospitalName}.",
                     'type' => 'general',
                 ]);
             }

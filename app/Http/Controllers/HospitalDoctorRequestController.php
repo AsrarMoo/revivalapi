@@ -61,7 +61,7 @@ class HospitalDoctorRequestController extends Controller
                     'user_id' => $admin_id,
                     'created_by' => Auth::id(),
                     'title' => 'طلب جديد لإضافة طبيب',
-                    'message' => "قام المستشفى ({$hospital->hospital_name}) بإرسال طلب لإضافة الطبيب ({$doctor->doctor_name}).",
+                    'message' => "قام  ({$hospital->hospital_name}) بإرسال طلب لإضافة الطبيب ({$doctor->doctor_name}).",
                     'type' => 'adding',
                    
                     'request_id' => $requestData->request_id, // 👈 هذا الجديد
