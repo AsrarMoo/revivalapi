@@ -581,17 +581,13 @@ public function countDoctors()
 }
 public function getDoctorsWithDetails()
 {
-    $doctors = HospitalDoctor::with(['doctor.specialty'])->get()->map(function ($item) {
-        $doctor = $item->doctor;
-
-        // نحول الطبيب إلى مصفوفة عشان نقدر نعدل ونضيف
-        $doctorArray = $doctor->toArray();
-
-        // نضيف اسم التخصص
-        $doctorArray['specialty_name'] = $doctor->specialty->specialty_name ?? 'غير محدد';
-
-        return $doctorArray;
-    });
+    $doctors = Doctor::with('specialty')
+        ->get()
+        ->map(function ($doctor) {
+            $doctorArray = $doctor->toArray();
+            $doctorArray['specialty_name'] = $doctor->specialty->specialty_name ?? 'غير محدد';
+            return $doctorArray;
+        });
 
     return response()->json($doctors);
 }
